@@ -11,12 +11,14 @@ public sealed class VideoPlaybackController(
 	private IMediaPlaybackEngine? _engine;
 	private PlaybackRequest? _request;
 	private MediaResponse? _mediaResponse;
+	private MediaSource? _currentSource;
 	private PlaybackProgressInfo_PlayMethod _playMethod;
 
 	public PlaybackKind Kind => PlaybackKind.Video;
 	public PlaybackState State => _engine?.State ?? PlaybackState.Stopped;
 	public TimeSpan Position => _engine?.Position ?? TimeSpan.Zero;
 	public TimeSpan Duration => _engine?.Duration ?? TimeSpan.Zero;
+	public MediaSource? CurrentSource => _currentSource;
 
 	public async Task PrepareAsync(PlaybackRequest request, IMediaPlaybackEngine engine, CancellationToken cancellationToken = default)
 	{
@@ -31,13 +33,14 @@ public sealed class VideoPlaybackController(
 		}
 
 		_playMethod = _mediaResponse.PlayMethod;
-		await _engine.OpenAsync(new MediaSource(
+		_currentSource = new MediaSource(
 			_mediaResponse.Uri,
 			_mediaResponse.PlaybackSessionId,
 			_mediaResponse.MediaSourceId,
 			_mediaResponse.PlayMethod,
 			_mediaResponse.MediaSourceInfo,
-			_mediaResponse.MediaSourceInfo.DefaultAudioStreamIndex ?? 0), cancellationToken);
+			_mediaResponse.MediaSourceInfo.DefaultAudioStreamIndex ?? 0);
+		await _engine.OpenAsync(_currentSource, cancellationToken);
 	}
 
 	public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -71,6 +74,7 @@ public sealed class VideoPlaybackController(
 		}
 
 		await jellyfinClient.Stop();
+		_currentSource = null;
 		_mediaResponse = null;
 		_request = null;
 	}

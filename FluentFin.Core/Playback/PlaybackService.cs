@@ -15,6 +15,7 @@ public sealed class PlaybackService(
 	public PlaybackState State => _activeController?.State ?? PlaybackState.Stopped;
 	public TimeSpan Position => _activeController?.Position ?? TimeSpan.Zero;
 	public TimeSpan Duration => _activeController?.Duration ?? TimeSpan.Zero;
+	public MediaSource? CurrentSource => _activeController?.CurrentSource;
 	public PlaybackQueue Queue { get; } = new();
 
 	public async Task PlayAsync(PlaybackRequest request, CancellationToken cancellationToken = default)
@@ -27,19 +28,34 @@ public sealed class PlaybackService(
 			throw new NotSupportedException($"No playback controller is registered for {request.Kind}.");
 		}
 
-		if (_activeController is { } active && active != controller)
+		var isDifferentItem = CurrentItem?.JellyfinId != request.StartItem.JellyfinId;
+		if (_activeController is { } active && (active != controller || isDifferentItem))
 		{
-			logger.LogInformation("Stopping active playback controller before switching. From={From}, To={To}", active.Kind, controller.Kind);
+			logger.LogInformation("Stopping active playback controller before switching. From={From}, To={To}, IsDifferentItem={IsDifferentItem}",
+				active.Kind, controller.Kind, isDifferentItem);
 			await active.StopAsync(cancellationToken);
-			await engineManager.DeactivateAsync(cancellationToken);
+
+			if (active != controller)
+			{
+				await engineManager.DeactivateAsync(cancellationToken);
+			}
 		}
 
 		Queue.Replace(request.EffectiveQueue, request.StartIndex);
 		_activeController = controller;
 
-		var engine = await engineManager.ActivateAsync(request.Kind, cancellationToken);
-		await controller.PrepareAsync(request, engine, cancellationToken);
-		await controller.StartAsync(cancellationToken);
+		try
+		{
+			var engine = await engineManager.ActivateAsync(request.Kind, cancellationToken);
+			await controller.PrepareAsync(request, engine, cancellationToken);
+			await controller.StartAsync(cancellationToken);
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "PlaybackService failed to start playback. Kind={Kind}, ItemId={ItemId}",
+				request.Kind, request.StartItem.JellyfinId);
+			throw;
+		}
 	}
 
 	public async Task PauseAsync(CancellationToken cancellationToken = default)

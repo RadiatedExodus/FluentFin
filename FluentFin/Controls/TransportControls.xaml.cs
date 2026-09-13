@@ -21,6 +21,12 @@ public sealed partial class TransportControls : UserControl
 	private readonly Subject<PointerRoutedEventArgs> _onPointerMoved = new();
 	private readonly SymbolIcon _playSymbol = new(Symbol.Play);
 	private readonly SymbolIcon _pauseSymbol = new(Symbol.Pause);
+	private bool _isSeekingWithSlider;
+	private bool _isUpdatingSliderFromPlayer;
+	private bool _resumePlaybackAfterSliderSeek;
+	private TimeSpan? _pendingSliderSeek;
+	private DateTimeOffset _holdSliderPositionUntil;
+	private int _sliderSeekVersion;
 
 	[GeneratedDependencyProperty]
 	public partial bool IsSkipButtonVisible { get; set; }
@@ -75,11 +81,31 @@ public sealed partial class TransportControls : UserControl
 		{
 			try
 			{
-				tc.TimeSlider.Value = e.TotalMilliseconds;
-				tc.TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(e);
-				tc.TxtRemainingTime.Text = TimeRemaining(e, duration);
+				var shouldHoldSlider = tc._isSeekingWithSlider ||
+					(tc._pendingSliderSeek is not null && DateTimeOffset.Now < tc._holdSliderPositionUntil);
+
+				if (tc._pendingSliderSeek is { } pending && Math.Abs((e - pending).TotalMilliseconds) < 1500)
+				{
+					tc._pendingSliderSeek = null;
+					tc._holdSliderPositionUntil = DateTimeOffset.MinValue;
+					shouldHoldSlider = false;
+				}
+
+				var displayPosition = shouldHoldSlider && tc._pendingSliderSeek is { } target ? target : e;
+				if (!shouldHoldSlider)
+				{
+					tc._isUpdatingSliderFromPlayer = true;
+					tc.TimeSlider.Value = e.TotalMilliseconds;
+					tc._isUpdatingSliderFromPlayer = false;
+				}
+
+				tc.TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(displayPosition);
+				tc.TxtRemainingTime.Text = TimeRemaining(displayPosition, duration);
 			}
-			catch { }
+			catch
+			{
+				tc._isUpdatingSliderFromPlayer = false;
+			}
 		});
 		controller.Playing.ObserveOn(RxApp.MainThreadScheduler).Subscribe(_ => tc.PlayPauseButton.Content = tc._pauseSymbol);
 		controller.Paused.ObserveOn(RxApp.MainThreadScheduler).Subscribe(_ => tc.PlayPauseButton.Content = tc._playSymbol);
@@ -103,26 +129,35 @@ public sealed partial class TransportControls : UserControl
 		TimeSlider
 			.Events()
 			.ValueChanged
-			.Where(x => Math.Abs(x.NewValue - Player.Position.TotalMilliseconds) > 5000)
 			.Subscribe(x =>
 			{
 				try
 				{
-					var currentState = Player.State;
-					if (currentState is MediaPlayerState.Playing)
+					if (_isUpdatingSliderFromPlayer)
 					{
-						Player.Pause();
+						return;
 					}
 
-					Player.SeekTo(TimeSpan.FromMilliseconds(x.NewValue));
+					_pendingSliderSeek = TimeSpan.FromMilliseconds(x.NewValue);
+					TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(_pendingSliderSeek.Value);
+					TxtRemainingTime.Text = TimeRemaining(_pendingSliderSeek.Value, TimeSpan.FromMilliseconds(TimeSlider.Maximum));
 
-					if (currentState is MediaPlayerState.Playing)
+					if (!_isSeekingWithSlider)
 					{
-						Player.Play();
+						_ = CommitSliderSeekAfterQuietPeriod(++_sliderSeekVersion);
 					}
 				}
 				catch { }
 			});
+
+		TimeSlider.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) =>
+		{
+			BeginSliderSeek();
+		}), true);
+
+		TimeSlider.AddHandler(PointerReleasedEvent, new PointerEventHandler((_, _) => CommitSliderSeek()), true);
+		TimeSlider.AddHandler(PointerCanceledEvent, new PointerEventHandler((_, _) => CommitSliderSeek()), true);
+		TimeSlider.PointerCaptureLost += (_, _) => CommitSliderSeek();
 
 		_onPointerMoved
 			.ObserveOn(RxApp.MainThreadScheduler)
@@ -216,6 +251,69 @@ public sealed partial class TransportControls : UserControl
 	private async Task TogglePlayPause()
 	{
 		await Player.TogglePlayPlause(JellyfinClient);
+	}
+
+	private async Task CommitSliderSeekAfterQuietPeriod(int version)
+	{
+		await Task.Delay(150);
+		if (version == _sliderSeekVersion && !_isSeekingWithSlider)
+		{
+			CommitSliderSeek();
+		}
+	}
+
+	private void BeginSliderSeek()
+	{
+		if (_isSeekingWithSlider)
+		{
+			return;
+		}
+
+		_isSeekingWithSlider = true;
+		_pendingSliderSeek = TimeSpan.FromMilliseconds(TimeSlider.Value);
+		_resumePlaybackAfterSliderSeek = Player?.State is MediaPlayerState.Playing;
+
+		if (_resumePlaybackAfterSliderSeek)
+		{
+			try
+			{
+				Player.Pause();
+			}
+			catch { }
+		}
+	}
+
+	private void CommitSliderSeek()
+	{
+		if (!_isSeekingWithSlider && _pendingSliderSeek is null)
+		{
+			return;
+		}
+
+		_isSeekingWithSlider = false;
+
+		if (Player is null)
+		{
+			return;
+		}
+
+		var position = _pendingSliderSeek ?? TimeSpan.FromMilliseconds(TimeSlider.Value);
+		var shouldResume = _resumePlaybackAfterSliderSeek;
+		_pendingSliderSeek = position;
+		_holdSliderPositionUntil = DateTimeOffset.Now.AddSeconds(2);
+		_sliderSeekVersion++;
+		_resumePlaybackAfterSliderSeek = false;
+
+		try
+		{
+			Player.SeekTo(position);
+
+			if (shouldResume)
+			{
+				Player.Play();
+			}
+		}
+		catch { }
 	}
 }
 

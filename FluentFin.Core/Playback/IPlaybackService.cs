@@ -7,6 +7,7 @@ public interface IPlaybackService
 	PlaybackState State { get; }
 	TimeSpan Position { get; }
 	TimeSpan Duration { get; }
+	MediaSource? CurrentSource { get; }
 	PlaybackQueue Queue { get; }
 
 	Task PlayAsync(PlaybackRequest request, CancellationToken cancellationToken = default);

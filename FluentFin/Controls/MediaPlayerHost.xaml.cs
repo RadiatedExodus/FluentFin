@@ -131,8 +131,9 @@ public sealed partial class MediaPlayerHost : UserControl
 
 		DispatcherQueue.TryEnqueue(() =>
 		{
-			Player = new VlcMediaPlayerController(view, e.SwapChainOptions, TransportControls.AudioSelectionButton);
-			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Vlc);
+			var player = new VlcMediaPlayerController(view, e.SwapChainOptions, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Vlc, player);
+			Player = player;
 		});
 	}
 
@@ -151,8 +152,9 @@ public sealed partial class MediaPlayerHost : UserControl
 				_flyleafStarted = true;
 			}
 
-			Player = new FlyleafMediaPlayerController(host, TransportControls.AudioSelectionButton);
-			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Flyleaf);
+			var player = new FlyleafMediaPlayerController(host, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Flyleaf, player);
+			Player = player;
 		});
 	}
 
@@ -165,19 +167,20 @@ public sealed partial class MediaPlayerHost : UserControl
 
 		DispatcherQueue.TryEnqueue(() =>
 		{
-			Player = new WindowsMediaPlayerController(element, TransportControls.AudioSelectionButton);
-			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.WindowsMediaPlayer);
+			var player = new WindowsMediaPlayerController(element, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.WindowsMediaPlayer, player);
+			Player = player;
 		});
 	}
 
-	private void RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType type)
+	private void RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType type, IMediaPlayerController player)
 	{
-		if (Player is null)
+		if (player is null)
 		{
 			return;
 		}
 
-		App.GetService<IHostedPlaybackEngineRegistry>().RegisterHostedPlayer(type, Player);
+		App.GetService<IHostedPlaybackEngineRegistry>().RegisterHostedPlayer(type, player);
 	}
 
 
