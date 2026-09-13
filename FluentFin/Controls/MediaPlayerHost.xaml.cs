@@ -6,6 +6,7 @@ using CommunityToolkit.WinUI;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.ViewModels;
 using FluentFin.MediaPlayers;
+using FluentFin.Playback;
 using FluentFin.ViewModels;
 using FlyleafLib.Controls.WinUI;
 using LibVLCSharp.Platforms.Windows;
@@ -131,6 +132,7 @@ public sealed partial class MediaPlayerHost : UserControl
 		DispatcherQueue.TryEnqueue(() =>
 		{
 			Player = new VlcMediaPlayerController(view, e.SwapChainOptions, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Vlc);
 		});
 	}
 
@@ -150,6 +152,7 @@ public sealed partial class MediaPlayerHost : UserControl
 			}
 
 			Player = new FlyleafMediaPlayerController(host, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.Flyleaf);
 		});
 	}
 
@@ -163,7 +166,18 @@ public sealed partial class MediaPlayerHost : UserControl
 		DispatcherQueue.TryEnqueue(() =>
 		{
 			Player = new WindowsMediaPlayerController(element, TransportControls.AudioSelectionButton);
+			RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType.WindowsMediaPlayer);
 		});
+	}
+
+	private void RegisterPlaybackEngine(Core.Contracts.Services.MediaPlayerType type)
+	{
+		if (Player is null)
+		{
+			return;
+		}
+
+		App.GetService<IHostedPlaybackEngineRegistry>().RegisterHostedPlayer(type, Player);
 	}
 
 
