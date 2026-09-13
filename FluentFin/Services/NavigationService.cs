@@ -3,6 +3,7 @@ using FluentFin.Contracts.Services;
 using FluentFin.Contracts.ViewModels;
 using FluentFin.Helpers;
 using FluentFin.UI.Core.Contracts.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 
@@ -13,6 +14,7 @@ namespace FluentFin.Services;
 public class NavigationService : INavigationService
 {
 	private readonly IPageService _pageService;
+	private readonly ILogger<NavigationService> _logger;
 	private object? _lastParameterUsed;
 	private Frame? _frame;
 
@@ -42,9 +44,10 @@ public class NavigationService : INavigationService
 	[MemberNotNullWhen(true, nameof(Frame), nameof(_frame))]
 	public bool CanGoBack => Frame != null && Frame.CanGoBack;
 
-	public NavigationService(IPageService pageService)
+	public NavigationService(IPageService pageService, ILogger<NavigationService> logger)
 	{
 		_pageService = pageService;
+		_logger = logger;
 	}
 
 	private void RegisterFrameEvents()
@@ -84,6 +87,13 @@ public class NavigationService : INavigationService
 	{
 		try
 		{
+			_logger.LogInformation("Navigation requested. PageKey={PageKey}, ParameterType={ParameterType}, HasFrame={HasFrame}, CurrentContent={CurrentContent}, ClearNavigation={ClearNavigation}",
+				pageKey,
+				parameter?.GetType().FullName ?? "<null>",
+				_frame is not null,
+				_frame?.Content?.GetType().FullName ?? "<null>",
+				clearNavigation);
+
 			var pageType = _pageService.GetPageType(pageKey);
 
 			if (_frame != null && (_frame.Content?.GetType() != pageType || (parameter != null && !parameter.Equals(_lastParameterUsed))))
@@ -91,6 +101,7 @@ public class NavigationService : INavigationService
 				_frame.Tag = clearNavigation;
 				var vmBeforeNavigation = _frame.GetPageViewModel();
 				var navigated = _frame.Navigate(pageType, parameter);
+				_logger.LogInformation("Frame.Navigate completed. PageKey={PageKey}, PageType={PageType}, Navigated={Navigated}", pageKey, pageType.FullName, navigated);
 				if (navigated)
 				{
 					_lastParameterUsed = parameter;
@@ -103,10 +114,14 @@ public class NavigationService : INavigationService
 				return navigated;
 			}
 
+			_logger.LogInformation("Navigation skipped. PageKey={PageKey}, Reason={Reason}",
+				pageKey,
+				_frame is null ? "FrameIsNull" : "AlreadyOnPageWithSameParameter");
 			return false;
 		}
-		catch
+		catch (Exception ex)
 		{
+			_logger.LogError(ex, "Navigation failed. PageKey={PageKey}, ParameterType={ParameterType}", pageKey, parameter?.GetType().FullName ?? "<null>");
 			return false;
 		}
 
@@ -116,6 +131,7 @@ public class NavigationService : INavigationService
 	{
 		if (sender is Frame frame)
 		{
+			_logger.LogInformation("Frame navigated. SourcePageType={SourcePageType}, ParameterType={ParameterType}", e.SourcePageType.FullName, e.Parameter?.GetType().FullName ?? "<null>");
 			var clearNavigation = (bool)frame.Tag;
 			if (clearNavigation)
 			{
@@ -124,7 +140,20 @@ public class NavigationService : INavigationService
 
 			if (frame.GetPageViewModel() is INavigationAware navigationAware)
 			{
-				await navigationAware.OnNavigatedTo(e.Parameter);
+				try
+				{
+					_logger.LogInformation("Calling OnNavigatedTo. ViewModel={ViewModel}", navigationAware.GetType().FullName);
+					await navigationAware.OnNavigatedTo(e.Parameter!);
+					_logger.LogInformation("OnNavigatedTo completed. ViewModel={ViewModel}", navigationAware.GetType().FullName);
+				}
+				catch (Exception ex)
+				{
+					_logger.LogError(ex, "OnNavigatedTo failed. ViewModel={ViewModel}, SourcePageType={SourcePageType}", navigationAware.GetType().FullName, e.SourcePageType.FullName);
+				}
+			}
+			else
+			{
+				_logger.LogInformation("Navigated page has no INavigationAware view model. SourcePageType={SourcePageType}", e.SourcePageType.FullName);
 			}
 
 			Navigated?.Invoke(sender, e);

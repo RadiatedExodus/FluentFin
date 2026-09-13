@@ -1,6 +1,8 @@
 ﻿using FluentFin.Core.Contracts.Services;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace FluentFin.Core.Services;
 
@@ -8,9 +10,11 @@ public partial class JellyfinClient
 {
 	public async Task<BaseItemDtoQueryResult?> GetContinueWatching()
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin GetContinueWatching started. UserId={UserId}", UserId);
 		try
 		{
-			return await _jellyfinApiClient.UserItems.Resume.GetAsync(x =>
+			var response = await _jellyfinApiClient.UserItems.Resume.GetAsync(x =>
 			{
 				var query = x.QueryParameters;
 				query.Limit = 12;
@@ -20,19 +24,26 @@ public partial class JellyfinClient
 				query.EnableTotalRecordCount = false;
 				query.MediaTypes = [MediaType.Video];
 			});
+			logger.LogInformation("Jellyfin GetContinueWatching completed. Count={Count}, TotalRecordCount={TotalRecordCount}, ElapsedMs={ElapsedMs}",
+				response?.Items?.Count ?? 0,
+				response?.TotalRecordCount,
+				elapsed.ElapsedMilliseconds);
+			return response;
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(ex, @"Unhandled exception");
+			logger.LogError(ex, "Jellyfin GetContinueWatching failed. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
 			return null;
 		}
 	}
 
 	public async Task<BaseItemDtoQueryResult?> GetNextUp()
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin GetNextUp started. UserId={UserId}", UserId);
 		try
 		{
-			return await _jellyfinApiClient.Shows.NextUp.GetAsync(x =>
+			var response = await _jellyfinApiClient.Shows.NextUp.GetAsync(x =>
 			{
 				var query = x.QueryParameters;
 				query.Limit = 24;
@@ -46,46 +57,63 @@ public partial class JellyfinClient
 				query.EnableResumable = false;
 				query.EnableRewatching = false;
 			});
+			logger.LogInformation("Jellyfin GetNextUp completed. Count={Count}, TotalRecordCount={TotalRecordCount}, ElapsedMs={ElapsedMs}",
+				response?.Items?.Count ?? 0,
+				response?.TotalRecordCount,
+				elapsed.ElapsedMilliseconds);
+			return response;
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(ex, @"Unhandled exception");
+			logger.LogError(ex, "Jellyfin GetNextUp failed. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
 			return null;
 		}
 	}
 
-	public async IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries()
+	public async IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries([EnumeratorCancellation] CancellationToken cancellationToken = default)
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin GetRecentItemsFromUserLibraries started. UserId={UserId}", UserId);
 		BaseItemDtoQueryResult? views = null;
 		try
 		{
-			views = await _jellyfinApiClient.UserViews.GetAsync(x => x.QueryParameters.UserId = UserId);
+			views = await _jellyfinApiClient.UserViews.GetAsync(x => x.QueryParameters.UserId = UserId, cancellationToken);
+			logger.LogInformation("Jellyfin user views loaded for recent items. Count={Count}, ElapsedMs={ElapsedMs}", views?.Items?.Count ?? 0, elapsed.ElapsedMilliseconds);
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(ex, @"Unhandled exception");
+			logger.LogError(ex, "Jellyfin user views failed for recent items. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
 		}
 
 		if (views is null or { Items: null })
 		{
+			logger.LogInformation("Jellyfin recent items stopped because user views were empty. ResponseIsNull={ResponseIsNull}, ElapsedMs={ElapsedMs}", views is null, elapsed.ElapsedMilliseconds);
 			yield break;
 		}
 
-		foreach (var library in views.Items)
+		var libraries = views.Items
+			.Where(library => library is not null && library.CollectionType is not BaseItemDto_CollectionType.Music)
+			.ToList();
+		logger.LogInformation("Jellyfin recent items querying libraries. LibraryCount={LibraryCount}, MaxDegreeOfParallelism={MaxDegreeOfParallelism}, ElapsedMs={ElapsedMs}",
+			libraries.Count,
+			4,
+			elapsed.ElapsedMilliseconds);
+		var results = new RecentItemDtoQueryResult?[libraries.Count];
+
+		await Parallel.ForEachAsync(libraries.Index(), new ParallelOptions
 		{
-			if (library is null)
-			{
-				continue;
-			}
-
-			if (library.CollectionType is BaseItemDto_CollectionType.Music)
-			{
-				continue;
-			}
-
+			MaxDegreeOfParallelism = 4,
+			CancellationToken = cancellationToken,
+		}, async (entry, ct) =>
+		{
+			var library = entry.Item;
 			List<BaseItemDto>? info = [];
 			try
 			{
+				logger.LogInformation("Jellyfin latest items request started. LibraryId={LibraryId}, LibraryName={LibraryName}, CollectionType={CollectionType}",
+					library.Id,
+					library.Name,
+					library.CollectionType);
 				info = await _jellyfinApiClient.Items.Latest.GetAsync(x =>
 				{
 					var query = x.QueryParameters;
@@ -94,18 +122,46 @@ public partial class JellyfinClient
 					query.ImageTypeLimit = 1;
 					query.EnableImageTypes = [ImageType.Primary, ImageType.Backdrop, ImageType.Thumb];
 					query.ParentId = library.Id;
-				});
+				}, ct);
+				logger.LogInformation("Jellyfin latest items request completed. LibraryId={LibraryId}, LibraryName={LibraryName}, Count={Count}, ElapsedMs={ElapsedMs}",
+					library.Id,
+					library.Name,
+					info?.Count ?? 0,
+					elapsed.ElapsedMilliseconds);
+			}
+			catch (OperationCanceledException)
+			{
+				logger.LogInformation("Jellyfin latest items request cancelled. LibraryId={LibraryId}, LibraryName={LibraryName}, ElapsedMs={ElapsedMs}",
+					library.Id,
+					library.Name,
+					elapsed.ElapsedMilliseconds);
+				throw;
 			}
 			catch (Exception ex)
 			{
-				logger.LogError(ex, @"Unhandled exception");
+				logger.LogError(ex, "Jellyfin latest items request failed. LibraryId={LibraryId}, LibraryName={LibraryName}, ElapsedMs={ElapsedMs}",
+					library.Id,
+					library.Name,
+					elapsed.ElapsedMilliseconds);
 			}
 
 			if (info is not null and { Count: > 0 })
 			{
-				yield return new(library, [.. info]);
+				results[entry.Index] = new(library, [.. info]);
+			}
+		});
+
+		foreach (var result in results)
+		{
+			if (result is not null)
+			{
+				yield return result;
 			}
 		}
+
+		logger.LogInformation("Jellyfin GetRecentItemsFromUserLibraries completed. ResultRowCount={ResultRowCount}, ElapsedMs={ElapsedMs}",
+			results.Count(x => x is not null),
+			elapsed.ElapsedMilliseconds);
 	}
 
 	public async IAsyncEnumerable<BaseItemDto> GetUserLibraries()

@@ -486,11 +486,13 @@ public partial class JellyfinClient
 	{
 		try
 		{
+			logger.LogInformation("Jellyfin plugin load started");
 			SessionInfo.Plugins = await _jellyfinApiClient.Plugins.GetAsync() ?? [];
+			logger.LogInformation("Jellyfin plugin load completed. PluginCount={PluginCount}, HasPlaybackReporting={HasPlaybackReporting}", SessionInfo.Plugins.Count, SessionInfo.HasPlaybackReporting());
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(ex, @"Unhandled exception");
+			logger.LogError(ex, "Jellyfin plugin load failed");
 			return;
 		}
 	}

@@ -21,6 +21,7 @@ namespace FluentFin.Controls;
 public sealed partial class MediaPlayerHost : UserControl
 {
 	private readonly Subject<Unit> _pointerMoved = new();
+	private static bool _flyleafStarted;
 
 	[GeneratedDependencyProperty]
 	public partial bool IsSkipButtonVisible { get; set; }
@@ -142,6 +143,12 @@ public sealed partial class MediaPlayerHost : UserControl
 
 		DispatcherQueue.TryEnqueue(() =>
 		{
+			if (!_flyleafStarted)
+			{
+				App.StartFlyleaf();
+				_flyleafStarted = true;
+			}
+
 			Player = new FlyleafMediaPlayerController(host, TransportControls.AudioSelectionButton);
 		});
 	}

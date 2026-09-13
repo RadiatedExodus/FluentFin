@@ -14,6 +14,7 @@ namespace FluentFin.Core.Services;
 public partial class JellyfinClient
 {
 	private ClientWebSocket? _socket;
+	private Task? _socketTask;
 
 	public async Task SendWebsocketMessage<T>(T message)
 		where T : WebSocketMessage
@@ -35,9 +36,14 @@ public partial class JellyfinClient
 		await _socket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
 	}
 
-	private async Task StartWebSocketConnection(CancellationToken ct)
+	private void StartWebSocketConnection(CancellationToken ct)
 	{
-		await Task.Factory.StartNew(async () => await TryCreateSocketConnection(ct), ct, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+		if (_socketTask is { IsCompleted: false })
+		{
+			return;
+		}
+
+		_socketTask = Task.Run(() => TryCreateSocketConnection(ct), ct);
 	}
 
 	private async Task TryCreateSocketConnection(CancellationToken ct)
@@ -213,19 +219,21 @@ internal static class MessageConverter
 	{
 		var id = doc.RootElement.GetProperty("MessageId").GetString();
 		var array = doc.RootElement.GetProperty("Data");
-		List<TData?> data = [];
+		List<TData> data = [];
 
 		foreach (var item in array.EnumerateArray())
 		{
-			var text = item.GetRawText();
 			var parseNode = new JsonParseNode(item, _context);
-			data.Add(parseNode.GetObjectValue(CreateFromDiscriminatorValue<TData>));
+			if (parseNode.GetObjectValue(CreateFromDiscriminatorValue<TData>) is { } parsed)
+			{
+				data.Add(parsed);
+			}
 		}
 
 		return new TMessage
 		{
 			MessageId = Guid.TryParse(id, out var guid) ? guid : Guid.Empty,
-			Data = [.. data.Where(x => x is not null)]
+			Data = data
 		};
 	}
 

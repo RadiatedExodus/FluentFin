@@ -1,5 +1,6 @@
 ﻿using Flurl.Http;
 using Jellyfin.Sdk.Generated.Library.VirtualFolders;
+using System.Diagnostics;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +33,75 @@ public partial class JellyfinClient
 		catch (Exception ex)
 		{
 			logger.LogError(ex, @"Unhandled exception");
+			return null;
+		}
+	}
+
+	public async Task<PagedResult<BaseItemDto>?> GetItems(ItemQuery itemQuery, CancellationToken cancellationToken = default)
+	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin GetItems query started. ParentId={ParentId}, StartIndex={StartIndex}, Limit={Limit}, SortBy={SortBy}, SortOrder={SortOrder}, SearchTerm={SearchTerm}, IncludeItemTypes={IncludeItemTypes}, Genres={Genres}, Tags={Tags}, OfficialRatings={OfficialRatings}, Years={Years}",
+			itemQuery.ParentId,
+			itemQuery.StartIndex,
+			itemQuery.Limit,
+			itemQuery.SortBy,
+			itemQuery.SortOrder,
+			itemQuery.SearchTerm,
+			string.Join(",", itemQuery.IncludeItemTypes),
+			string.Join(",", itemQuery.Genres),
+			string.Join(",", itemQuery.Tags),
+			string.Join(",", itemQuery.OfficialRatings),
+			string.Join(",", itemQuery.Years));
+		try
+		{
+			var response = await _jellyfinApiClient.Items.GetAsync(x =>
+			{
+				var query = x.QueryParameters;
+				query.StartIndex = itemQuery.StartIndex;
+				query.Limit = itemQuery.Limit;
+				query.SortBy = itemQuery.SortBy is { } sortBy ? [sortBy] : null;
+				query.SortOrder = itemQuery.SortOrder is { } sortOrder ? [sortOrder] : null;
+				query.SearchTerm = itemQuery.SearchTerm;
+				query.Recursive = itemQuery.Recursive;
+				query.Fields = [ItemFields.PrimaryImageAspectRatio, ItemFields.DateCreated, ItemFields.Overview, ItemFields.Tags, ItemFields.Genres];
+				query.ImageTypeLimit = 1;
+				query.EnableImageTypes = [ImageType.Primary, ImageType.Backdrop, ImageType.Banner, ImageType.Thumb];
+				query.ParentId = itemQuery.ParentId;
+				query.IncludeItemTypes = itemQuery.IncludeItemTypes.Count > 0 ? [.. itemQuery.IncludeItemTypes] : null;
+				query.Genres = itemQuery.Genres.Count > 0 ? [.. itemQuery.Genres] : null;
+				query.Years = itemQuery.Years.Count > 0 ? [.. itemQuery.Years] : null;
+				query.Tags = itemQuery.Tags.Count > 0 ? [.. itemQuery.Tags] : null;
+				query.OfficialRatings = itemQuery.OfficialRatings.Count > 0 ? [.. itemQuery.OfficialRatings] : null;
+			}, cancellationToken);
+
+			if (response is null)
+			{
+				logger.LogWarning("Jellyfin GetItems query returned null. ParentId={ParentId}, StartIndex={StartIndex}, ElapsedMs={ElapsedMs}", itemQuery.ParentId, itemQuery.StartIndex, elapsed.ElapsedMilliseconds);
+				return null;
+			}
+
+			var result = new PagedResult<BaseItemDto>
+			{
+				Items = response.Items ?? [],
+				StartIndex = response.StartIndex ?? itemQuery.StartIndex,
+				TotalRecordCount = response.TotalRecordCount ?? response.Items?.Count ?? 0,
+			};
+			logger.LogInformation("Jellyfin GetItems query completed. ParentId={ParentId}, StartIndex={StartIndex}, ItemCount={ItemCount}, TotalRecordCount={TotalRecordCount}, ElapsedMs={ElapsedMs}",
+				itemQuery.ParentId,
+				result.StartIndex,
+				result.Items.Count,
+				result.TotalRecordCount,
+				elapsed.ElapsedMilliseconds);
+			return result;
+		}
+		catch (OperationCanceledException)
+		{
+			logger.LogInformation("Jellyfin GetItems query cancelled. ParentId={ParentId}, StartIndex={StartIndex}, ElapsedMs={ElapsedMs}", itemQuery.ParentId, itemQuery.StartIndex, elapsed.ElapsedMilliseconds);
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Jellyfin GetItems query failed. ParentId={ParentId}, StartIndex={StartIndex}, ElapsedMs={ElapsedMs}", itemQuery.ParentId, itemQuery.StartIndex, elapsed.ElapsedMilliseconds);
 			return null;
 		}
 	}

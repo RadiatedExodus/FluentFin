@@ -1,79 +1,31 @@
 ﻿using System.Collections.ObjectModel;
-using System.Reactive.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.Input;
-using DynamicData;
-using DynamicData.Binding;
 using FluentFin.Contracts.ViewModels;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Services;
 using Jellyfin.Sdk.Generated.Models;
-using ReactiveUI;
+using Microsoft.Extensions.Logging;
 
 namespace FluentFin.Core.ViewModels;
 
 public partial class LibraryViewModel : ObservableObject, INavigationAware
 {
-	private readonly SourceCache<BaseItemViewModel, Guid> _itemsCache = new(x => x.Id ?? Guid.Empty);
-	private readonly ReadOnlyObservableCollection<BaseItemViewModel> _items;
+	private const int PageSize = 100;
+	private BaseItemDto? _library;
+	private CancellationTokenSource? _loadCts;
+	private readonly ILogger<LibraryViewModel> _logger;
 
-
-	public LibraryViewModel(IJellyfinClient jellyfinClient)
+	public LibraryViewModel(IJellyfinClient jellyfinClient, ILogger<LibraryViewModel> logger)
 	{
 		JellyfinClient = jellyfinClient;
+		_logger = logger;
 
-		var pageRequest = this.WhenAnyValue(x => x.SelectedPage).Select(page => new PageRequest(page + 1, 100));
-		var comparer = this.WhenAnyValue(x => x.SortBy, x => x.Order)
-						   .Select(GetComparer);
-
-		var filter = this.WhenAnyValue(x => x.Filter)
-			.WhereNotNull()
-			.SelectMany(x => x.WhenAnyPropertyChanged())
-			.Where(x => x is not null)
-			.Select(x => (Func<BaseItemViewModel, bool>)x!.IsVisible);
-
-		Filter.WhenAnyPropertyChanged()
-			.Subscribe(x =>
-			{
-				_itemsCache.Refresh();
-				UpdateNumberOfPages();
-			});
-
-		_itemsCache
-			.Connect()
-			.RefCount()
-			.Filter(Filter.IsVisible)
-			.SortAndPage(comparer, pageRequest)
-			.Bind(out _items)
-			.Subscribe();
+		Filter.Changed += (_, _) => ReloadFromFirstPage();
 	}
 
-	private IComparer<BaseItemViewModel> GetComparer((ItemSortBy, SortOrder) sortDescription)
-	{
-		return sortDescription switch
-		{
-			(ItemSortBy.Name, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.Name ?? ""),
-			(ItemSortBy.CommunityRating, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.CommunityRating ?? 0),
-			(ItemSortBy.CriticRating, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.CriticRating ?? 0),
-			(ItemSortBy.DateCreated, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.DateCreated ?? new DateTimeOffset()),
-			(ItemSortBy.DatePlayed, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.UserData?.LastPlayedDate ?? new DateTimeOffset()),
-			(ItemSortBy.PlayCount, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.UserData?.PlayCount ?? 0),
-			(ItemSortBy.PremiereDate, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.PremiereDate ?? new DateTimeOffset()),
-			(ItemSortBy.Runtime, SortOrder.Ascending) => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.RunTimeTicks ?? 0),
-
-			(ItemSortBy.Name, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.Name ?? ""),
-			(ItemSortBy.CommunityRating, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.CommunityRating ?? 0),
-			(ItemSortBy.CriticRating, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.CriticRating ?? 0),
-			(ItemSortBy.DateCreated, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.DateCreated ?? new DateTimeOffset()),
-			(ItemSortBy.DatePlayed, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.UserData?.LastPlayedDate ?? new DateTimeOffset()),
-			(ItemSortBy.PlayCount, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.UserData?.PlayCount ?? 0),
-			(ItemSortBy.PremiereDate, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.PremiereDate ?? new DateTimeOffset()),
-			(ItemSortBy.Runtime, SortOrder.Descending) => SortExpressionComparer<BaseItemViewModel>.Descending(x => x.RunTimeTicks ?? 0),
-
-			_ => SortExpressionComparer<BaseItemViewModel>.Ascending(x => x.Name ?? ""),
-		};
-	}
-
-	public ReadOnlyObservableCollection<BaseItemViewModel> Items => _items;
+	public ObservableCollection<BaseItemViewModel> Items { get; } = [];
 
 	[ObservableProperty]
 	public partial int NumberOfPages { get; set; }
@@ -107,16 +59,34 @@ public partial class LibraryViewModel : ObservableObject, INavigationAware
 	public LibraryFilter Filter { get; set; } = new();
 
 	[RelayCommand]
-	public void UpdateSortBy(ItemSortBy sortBy) => SortBy = sortBy;
+	public void UpdateSortBy(ItemSortBy sortBy)
+	{
+		_logger.LogInformation("Library sort-by changed. SortBy={SortBy}", sortBy);
+		SortBy = sortBy;
+		ReloadFromFirstPage();
+	}
 
 	[RelayCommand]
-	public void UpdateSortOrder(SortOrder order) => Order = order;
+	public void UpdateSortOrder(SortOrder order)
+	{
+		_logger.LogInformation("Library sort-order changed. SortOrder={SortOrder}", order);
+		Order = order;
+		ReloadFromFirstPage();
+	}
 
 
-	public Task OnNavigatedFrom() => Task.CompletedTask;
+	public Task OnNavigatedFrom()
+	{
+		_logger.LogInformation("LibraryViewModel navigated from. Cancelling active load. LibraryId={LibraryId}, LibraryName={LibraryName}", _library?.Id, _library?.Name);
+		_loadCts?.Cancel();
+		_loadCts?.Dispose();
+		_loadCts = null;
+		return Task.CompletedTask;
+	}
 
 	public async Task OnNavigatedTo(object parameter)
 	{
+		_logger.LogInformation("LibraryViewModel OnNavigatedTo started. ParameterType={ParameterType}", parameter?.GetType().FullName ?? "<null>");
 		if (parameter is BaseItemDto libraryDto)
 		{
 			await Initialize(libraryDto);
@@ -126,57 +96,228 @@ public partial class LibraryViewModel : ObservableObject, INavigationAware
 			var dto = await JellyfinClient.GetItem(id);
 			if(dto is null)
 			{
+				_logger.LogWarning("LibraryViewModel could not resolve library id. LibraryId={LibraryId}", id);
 				return;
 			}
 			await Initialize(dto);
+		}
+		else
+		{
+			_logger.LogWarning("LibraryViewModel received unsupported navigation parameter. ParameterType={ParameterType}", parameter?.GetType().FullName ?? "<null>");
 		}
 	}
 
 	private async Task Initialize(BaseItemDto dto)
 	{
+		var elapsed = Stopwatch.StartNew();
+		_logger.LogInformation("Library initialization started. LibraryId={LibraryId}, LibraryName={LibraryName}, CollectionType={CollectionType}",
+			dto.Id,
+			dto.Name,
+			dto.CollectionType);
+		_library = dto;
 		IsLoading = true;
 
-		var result = await JellyfinClient.GetItems(dto);
-
-		if (result is null or { Items: null })
+		try
 		{
-			return;
+			var cts = StartNewLoad();
+			var itemsTask = LoadPage(cts.Token);
+			var filtersTask = JellyfinClient.GetFilters(dto);
+
+			await itemsTask;
+			_logger.LogInformation("Library initial page loaded. LibraryId={LibraryId}, ItemCount={ItemCount}, NumberOfPages={NumberOfPages}, ElapsedMs={ElapsedMs}",
+				dto.Id,
+				Items.Count,
+				NumberOfPages,
+				elapsed.ElapsedMilliseconds);
+
+			var filters = await filtersTask;
+
+			if (filters is null)
+			{
+				_logger.LogWarning("Library filters returned null. LibraryId={LibraryId}, ElapsedMs={ElapsedMs}", dto.Id, elapsed.ElapsedMilliseconds);
+				return;
+			}
+
+			TagsSource = filters.Tags?.ToList() ?? [];
+			GenresSource = filters.Genres?.ToList() ?? [];
+			OfficialRatingsSource = filters.OfficialRatings?.ToList() ?? [];
+			YearsSource = filters.Years?.Where(x => x.HasValue).Select(x => x!.Value.ToString()).ToList() ?? [];
+			_logger.LogInformation("Library filters loaded. LibraryId={LibraryId}, Tags={Tags}, Genres={Genres}, OfficialRatings={OfficialRatings}, Years={Years}, ElapsedMs={ElapsedMs}",
+				dto.Id,
+				TagsSource.Count,
+				GenresSource.Count,
+				OfficialRatingsSource.Count,
+				YearsSource.Count,
+				elapsed.ElapsedMilliseconds);
 		}
-
-		_itemsCache.AddOrUpdate(result.Items.Select(BaseItemViewModel.FromDto));
-		UpdateNumberOfPages();
-
-		var filters = await JellyfinClient.GetFilters(dto);
-
-		if (filters is null)
+		catch (OperationCanceledException)
 		{
-			return;
+			_logger.LogInformation("Library initialization cancelled. LibraryId={LibraryId}, ElapsedMs={ElapsedMs}", dto.Id, elapsed.ElapsedMilliseconds);
 		}
-
-		TagsSource = filters.Tags?.ToList() ?? [];
-		GenresSource = filters.Genres?.ToList() ?? [];
-		OfficialRatingsSource = filters.OfficialRatings?.ToList() ?? [];
-		YearsSource = filters.Years?.Where(x => x.HasValue).Select(x => x!.Value.ToString()).ToList() ?? [];
-
-		IsLoading = false;
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Library initialization failed. LibraryId={LibraryId}, ElapsedMs={ElapsedMs}", dto.Id, elapsed.ElapsedMilliseconds);
+		}
+		finally
+		{
+			IsLoading = false;
+			_logger.LogInformation("Library initialization completed. LibraryId={LibraryId}, IsLoading={IsLoading}, ElapsedMs={ElapsedMs}", dto.Id, IsLoading, elapsed.ElapsedMilliseconds);
+		}
 	}
 
-	private void UpdateNumberOfPages()
+	private CancellationTokenSource StartNewLoad()
 	{
-		NumberOfPages = Filter.IsEmptyFilter()
-			? (int)Math.Ceiling(_itemsCache.Items.Count / 100d)
-			: (int)Math.Ceiling(Items.Count / 100d);
+		_loadCts?.Cancel();
+		_loadCts?.Dispose();
+		_loadCts = new CancellationTokenSource();
+		return _loadCts;
 	}
+
+	private void ReloadFromFirstPage()
+	{
+		if (_library is null)
+		{
+			_logger.LogInformation("Library reload skipped because no library is loaded");
+			return;
+		}
+
+		_logger.LogInformation("Library reload requested. LibraryId={LibraryId}, LibraryName={LibraryName}, SelectedPage={SelectedPage}, SortBy={SortBy}, SortOrder={SortOrder}, TagFilters={TagFilters}, GenreFilters={GenreFilters}, RatingFilters={RatingFilters}, YearFilters={YearFilters}",
+			_library.Id,
+			_library.Name,
+			SelectedPage,
+			SortBy,
+			Order,
+			Filter.Tags.Count,
+			Filter.Genres.Count,
+			Filter.OfficialRatings.Count,
+			Filter.Years.Count);
+
+		if (SelectedPage == 0)
+		{
+			_ = LoadPageWithLoading();
+		}
+		else
+		{
+			SelectedPage = 0;
+		}
+	}
+
+	partial void OnSelectedPageChanged(int value)
+	{
+		if (_library is not null)
+		{
+			_logger.LogInformation("Library selected page changed. LibraryId={LibraryId}, SelectedPage={SelectedPage}", _library.Id, value);
+			_ = LoadPageWithLoading();
+		}
+	}
+
+	private async Task LoadPageWithLoading()
+	{
+		IsLoading = true;
+		try
+		{
+			var cts = StartNewLoad();
+			await LoadPage(cts.Token);
+		}
+		catch (OperationCanceledException)
+		{
+			_logger.LogInformation("Library page load cancelled. LibraryId={LibraryId}, SelectedPage={SelectedPage}", _library?.Id, SelectedPage);
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Library page load failed. LibraryId={LibraryId}, SelectedPage={SelectedPage}", _library?.Id, SelectedPage);
+		}
+		finally
+		{
+			IsLoading = false;
+		}
+	}
+
+	private async Task LoadPage(CancellationToken cancellationToken)
+	{
+		if (_library?.Id is not { } parentId)
+		{
+			_logger.LogWarning("Library page load skipped because library id is missing");
+			return;
+		}
+
+		var query = new ItemQuery
+		{
+			ParentId = parentId,
+			StartIndex = SelectedPage * PageSize,
+			Limit = PageSize,
+			SortBy = SortBy,
+			SortOrder = Order,
+			IncludeItemTypes = GetIncludeItemTypes(_library),
+			Genres = [.. Filter.Genres],
+			Tags = [.. Filter.Tags],
+			OfficialRatings = [.. Filter.OfficialRatings],
+			Years = [.. Filter.Years.Select(x => int.TryParse(x, out var year) ? year : (int?)null).Where(x => x.HasValue).Select(x => x!.Value)],
+		};
+
+		var elapsed = Stopwatch.StartNew();
+		_logger.LogInformation("Library page load started. LibraryId={LibraryId}, LibraryName={LibraryName}, StartIndex={StartIndex}, Limit={Limit}, SortBy={SortBy}, SortOrder={SortOrder}, IncludeItemTypes={IncludeItemTypes}, Genres={Genres}, Tags={Tags}, OfficialRatings={OfficialRatings}, Years={Years}",
+			_library.Id,
+			_library.Name,
+			query.StartIndex,
+			query.Limit,
+			query.SortBy,
+			query.SortOrder,
+			string.Join(",", query.IncludeItemTypes),
+			string.Join(",", query.Genres),
+			string.Join(",", query.Tags),
+			string.Join(",", query.OfficialRatings),
+			string.Join(",", query.Years));
+
+		var result = await JellyfinClient.GetItems(query, cancellationToken);
+
+		if (result is null)
+		{
+			_logger.LogWarning("Library page load returned null. LibraryId={LibraryId}, StartIndex={StartIndex}, ElapsedMs={ElapsedMs}", _library.Id, query.StartIndex, elapsed.ElapsedMilliseconds);
+			return;
+		}
+
+		Items.Clear();
+		foreach (var item in result.Items.Select(BaseItemViewModel.FromDto))
+		{
+			Items.Add(item);
+		}
+
+		NumberOfPages = Math.Max(1, (int)Math.Ceiling(result.TotalRecordCount / (double)PageSize));
+		_logger.LogInformation("Library page load completed. LibraryId={LibraryId}, StartIndex={StartIndex}, ItemCount={ItemCount}, TotalRecordCount={TotalRecordCount}, NumberOfPages={NumberOfPages}, ElapsedMs={ElapsedMs}",
+			_library.Id,
+			result.StartIndex,
+			result.Items.Count,
+			result.TotalRecordCount,
+			NumberOfPages,
+			elapsed.ElapsedMilliseconds);
+	}
+
+	private static IReadOnlyList<BaseItemKind> GetIncludeItemTypes(BaseItemDto parent) =>
+		parent.CollectionType switch
+		{
+			BaseItemDto_CollectionType.Movies => [BaseItemKind.Movie],
+			BaseItemDto_CollectionType.Tvshows => [BaseItemKind.Series],
+			_ => []
+		};
 }
 
 public partial class LibraryFilter : ObservableObject
 {
+	public event EventHandler? Changed;
+
 	public LibraryFilter()
 	{
-		Tags.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Tags));
-		Genres.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Genres));
-		OfficialRatings.CollectionChanged += (_, _) => OnPropertyChanged(nameof(OfficialRatings));
-		Years.CollectionChanged += (_, _) => OnPropertyChanged(nameof(Years));
+		Tags.CollectionChanged += (_, _) => NotifyChanged(nameof(Tags));
+		Genres.CollectionChanged += (_, _) => NotifyChanged(nameof(Genres));
+		OfficialRatings.CollectionChanged += (_, _) => NotifyChanged(nameof(OfficialRatings));
+		Years.CollectionChanged += (_, _) => NotifyChanged(nameof(Years));
+	}
+
+	private void NotifyChanged(string propertyName)
+	{
+		OnPropertyChanged(propertyName);
+		Changed?.Invoke(this, EventArgs.Empty);
 	}
 
 	public ObservableCollection<string> Tags { get; set; } = [];

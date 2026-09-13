@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using DeviceId;
+using System.Diagnostics;
 using FluentFin.Contracts.Services;
 using FluentFin.Core;
 using FluentFin.Core.Contracts.Services;
@@ -107,6 +108,8 @@ public class JellyfinAuthenticationService(IJellyfinClient jellyfinClient,
 
 	public async Task<bool> Authenticate(SavedServer server, SavedUser user)
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Saved user authentication requested. ServerName={ServerName}, Username={Username}", server.DisplayName, user.Username);
 		var success = await Authenticate(server.GetServerUrl(), user.Username, user.Password.Unprotect(settingsService.GetEntropyBytes()));
 
 		if (success)
@@ -114,6 +117,11 @@ public class JellyfinAuthenticationService(IJellyfinClient jellyfinClient,
 			titleBarViewModel.CurrentServer = server;
 		}
 
+		logger.LogInformation("Saved user authentication finished. ServerName={ServerName}, Username={Username}, Success={Success}, ElapsedMs={ElapsedMs}",
+			server.DisplayName,
+			user.Username,
+			success,
+			elapsed.ElapsedMilliseconds);
 		return success;
 	}
 
@@ -149,6 +157,8 @@ public class JellyfinAuthenticationService(IJellyfinClient jellyfinClient,
 
 	private async Task<bool> Authenticate(string url, string username, string password)
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin AuthenticateByName started. Url={Url}, Username={Username}", url, username);
 
 		var client = GetClient(url);
 
@@ -162,15 +172,18 @@ public class JellyfinAuthenticationService(IJellyfinClient jellyfinClient,
 
 			if (auth is not null)
 			{
+				logger.LogInformation("Jellyfin AuthenticateByName returned user. UserId={UserId}, Username={Username}, ElapsedMs={ElapsedMs}", auth.User?.Id, auth.User?.Name, elapsed.ElapsedMilliseconds);
 				titleBarViewModel.User = auth.User;
 				await jellyfinClient.Initialize(url, auth);
+				logger.LogInformation("Jellyfin client initialized after authentication. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
 			}
 
+			logger.LogInformation("Jellyfin AuthenticateByName completed. Success={Success}, ElapsedMs={ElapsedMs}", auth is not null, elapsed.ElapsedMilliseconds);
 			return auth is not null;
 		}
 		catch (Exception ex)
 		{
-			logger.LogError(ex, "Unhandled exception");
+			logger.LogError(ex, "Jellyfin AuthenticateByName failed. Url={Url}, Username={Username}, ElapsedMs={ElapsedMs}", url, username, elapsed.ElapsedMilliseconds);
 			return false;
 		}
 	}

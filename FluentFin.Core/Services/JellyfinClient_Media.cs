@@ -11,7 +11,7 @@ namespace FluentFin.Core.Services;
 public partial class JellyfinClient
 {
 
-	public async Task<MediaResponse?> GetMediaUrl(BaseItemDto dto)
+	public async Task<MediaResponse?> GetMediaUrl(BaseItemDto dto, CancellationToken cancellationToken = default)
 	{
 		if (dto.Id is not { } id)
 		{
@@ -29,7 +29,8 @@ public partial class JellyfinClient
 		}
 
 		var endPointInfo = await EndpointInfo();
-		var bitRate = endPointInfo?.IsInNetwork == true ? 0 : await BitrateTest();
+		cancellationToken.ThrowIfCancellationRequested();
+		var bitRate = endPointInfo?.IsInNetwork == true ? 0 : await GetCachedBitrate(cancellationToken);
 
 		var startTime = TimeProvider.System.GetTimestamp();
 		var playbackInfoDto = new PlaybackInfoDto
@@ -45,7 +46,7 @@ public partial class JellyfinClient
 			playbackInfoDto.MaxStreamingBitrate = bitRate;
 		}
 
-		var playbackInfo = await _jellyfinApiClient.Items[id].PlaybackInfo.PostAsync(playbackInfoDto);
+		var playbackInfo = await _jellyfinApiClient.Items[id].PlaybackInfo.PostAsync(playbackInfoDto, cancellationToken: cancellationToken);
 
 		if (playbackInfo is null or { PlaySessionId: null } or { MediaSources: null })
 		{

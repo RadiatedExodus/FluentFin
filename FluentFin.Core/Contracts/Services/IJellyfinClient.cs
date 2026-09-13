@@ -26,6 +26,8 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<BaseItemDtoQueryResult?> GetItems(BaseItemDto parent, bool recursive = false);
 
+		Task<PagedResult<BaseItemDto>?> GetItems(ItemQuery query, CancellationToken cancellationToken = default);
+
 		Task ResetProgress(Guid id);
 
 		Task<BaseItemDtoQueryResult?> GetMediaFolders();
@@ -48,7 +50,7 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<BaseItemDto?> GetItem(Guid id);
 
-		IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries();
+		IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries(CancellationToken cancellationToken = default);
 
 		IAsyncEnumerable<BaseItemDto> GetUserLibraries();
 
@@ -60,7 +62,7 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<bool> Authenticate(string code);
 
-		Task<MediaResponse?> GetMediaUrl(BaseItemDto dto);
+		Task<MediaResponse?> GetMediaUrl(BaseItemDto dto, CancellationToken cancellationToken = default);
 
 		Uri GetImage(BaseItemDto item, ImageInfo info);
 

@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using DeviceId;
+using System.Diagnostics;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.WebSockets;
 using Flurl;
@@ -11,7 +12,8 @@ namespace FluentFin.Core.Services;
 public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 									IObserver<IInboundSocketMessage> socketMessageSender,
 									IJumpListService jumpListService,
-									IDeviceProfileFactory deviceProfileFactory) : IJellyfinClient
+									IDeviceProfileFactory deviceProfileFactory,
+									IBandwidthMeasurementCache bandwidthMeasurementCache) : IJellyfinClient
 {
 	private Jellyfin.Sdk.JellyfinApiClient _jellyfinApiClient = null!;
 	private string _token = "";
@@ -24,6 +26,9 @@ public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 
 	public async Task Initialize(string baseUrl, AuthenticationResult authResult)
 	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jellyfin Initialize started. BaseUrl={BaseUrl}, HasUser={HasUser}, HasAccessToken={HasAccessToken}", baseUrl, authResult.User is not null, !string.IsNullOrEmpty(authResult.AccessToken));
+
 		ArgumentNullException.ThrowIfNull(authResult.User);
 		ArgumentNullException.ThrowIfNull(authResult.User.Id);
 		ArgumentNullException.ThrowIfNullOrEmpty(authResult.AccessToken);
@@ -43,6 +48,7 @@ public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 		_settings.SetAccessToken(_token);
 		_settings.SetServerUrl(baseUrl);
 		_jellyfinApiClient = new Jellyfin.Sdk.JellyfinApiClient(new Jellyfin.Sdk.JellyfinRequestAdapter(new Jellyfin.Sdk.JellyfinAuthenticationProvider(_settings), _settings));
+		logger.LogInformation("Jellyfin API client created. UserId={UserId}, DeviceIdLength={DeviceIdLength}, ElapsedMs={ElapsedMs}", UserId, _deviceId.Length, elapsed.ElapsedMilliseconds);
 
 		await _jellyfinApiClient.Sessions.Capabilities.Full.PostAsync(new ClientCapabilitiesDto
 		{
@@ -54,16 +60,40 @@ public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 				GeneralCommandType.DisplayMessage,
 			]
 		});
+		logger.LogInformation("Jellyfin capabilities registered. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
 
-		await GetPlugins();
-		await StartWebSocketConnection(CancellationToken.None);
+		RunInBackground(GetPlugins());
+		logger.LogInformation("Jellyfin plugin load started in background");
+		StartWebSocketConnection(CancellationToken.None);
+		logger.LogInformation("Jellyfin websocket startup requested");
 
+		RunInBackground(InitializeJumpList());
+		logger.LogInformation("Jellyfin jump-list initialization started in background. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
+		logger.LogInformation("Jellyfin Initialize completed. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
+	}
+
+	private void RunInBackground(Task task)
+	{
+		_ = task.ContinueWith(t =>
+		{
+			if (t.Exception is not null)
+			{
+				logger.LogError(t.Exception, "Background Jellyfin initialization failed");
+			}
+		}, TaskContinuationOptions.OnlyOnFaulted);
+	}
+
+	private async Task InitializeJumpList()
+	{
+		var elapsed = Stopwatch.StartNew();
+		logger.LogInformation("Jump-list initialization started");
 		var libaries = new List<BaseItemDto>();
 		await foreach (var item in GetUserLibraries())
 		{
 			libaries.Add(item);
 		}
 		await jumpListService.Initialize(libaries);
+		logger.LogInformation("Jump-list initialization completed. LibraryCount={LibraryCount}, ElapsedMs={ElapsedMs}", libaries.Count, elapsed.ElapsedMilliseconds);
 	}
 
 	public async Task<BaseItemDtoQueryResult?> Search(string searchTerm)
@@ -134,6 +164,20 @@ public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 		double responseTimeSeconds = TimeProvider.System.GetElapsedTime(startTime).TotalSeconds;
 		double bytesPerSecond = totalBytesRead / responseTimeSeconds;
 		int bitrate = (int)Math.Round(bytesPerSecond * 8 * safetyRatio);
+		return bitrate;
+	}
+
+	private async Task<int> GetCachedBitrate(CancellationToken cancellationToken)
+	{
+		var cacheKey = BaseUrl;
+		if (bandwidthMeasurementCache.TryGet(cacheKey, out var cachedBitrate))
+		{
+			return cachedBitrate;
+		}
+
+		var bitrate = await BitrateTest();
+		cancellationToken.ThrowIfCancellationRequested();
+		bandwidthMeasurementCache.Set(cacheKey, bitrate);
 		return bitrate;
 	}
 

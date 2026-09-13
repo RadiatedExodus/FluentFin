@@ -108,6 +108,9 @@ public partial class App : Application
 			services.AddSingleton<ISettings, Settings>();
 			services.AddSingleton(knownFolders);
 			services.AddSingleton<ITaskBarProgress, TaskBarProgress>();
+			services.AddSingleton<IBandwidthMeasurementCache, BandwidthMeasurementCache>();
+			services.AddSingleton<IImageSourceCache, ImageSourceCache>();
+			services.AddSingleton<IBlurHashCache, BlurHashCache>();
 			services.AddSingleton<Subject<IInboundSocketMessage>>();
 			services.AddSingleton<IObservable<IInboundSocketMessage>>(sp => sp.GetRequiredService<Subject<IInboundSocketMessage>>());
 			services.AddSingleton<IObserver<IInboundSocketMessage>>(sp => sp.GetRequiredService<Subject<IInboundSocketMessage>>());
@@ -219,17 +222,18 @@ public partial class App : Application
 
 	protected async override void OnLaunched(LaunchActivatedEventArgs args)
 	{
-		await Host.StartAsync();
-
 		Locator.SetServiceProvider(Host.Services);
 
 		base.OnLaunched(args);
+		GetService<ILogger<App>>().LogInformation("App launched. ArgsType={ArgsType}", args.GetType().FullName);
 
 		MainWindow.Closed += MainWindow_Closed;
 
-		StartFlyleaf();
-
 		await GetService<IActivationService>().ActivateAsync(args);
+		GetService<ILogger<App>>().LogInformation("Activation service completed; starting host services");
+
+		await Host.StartAsync();
+		GetService<ILogger<App>>().LogInformation("Host services started");
 	}
 
 	private static bool IsPackaged()
@@ -251,7 +255,7 @@ public partial class App : Application
 		await GetService<IJellyfinClient>().Stop();
 	}
 
-	private static void StartFlyleaf()
+	public static void StartFlyleaf()
 	{
 		var location = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly()!.Location)!, "FFMpeg");
 		FlyleafLib.Engine.Start(new FlyleafLib.EngineConfig()
