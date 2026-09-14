@@ -14,6 +14,7 @@ using FluentFin.Dialogs.UserInput;
 using FluentFin.Dialogs.ViewModels;
 using FluentFin.Dialogs.Views;
 using FluentFin.Helpers;
+using FluentFin.MediaPlayers;
 using FluentFin.Plugins.Playback_Reporting;
 using FluentFin.Playback;
 using FluentFin.Playback.Presentation;
@@ -117,6 +118,7 @@ public partial class App : Application
 			services.AddSingleton<IPlaybackEngineManager, PlaybackEngineManager>();
 			services.AddSingleton<IHostedPlaybackEngineRegistry>(sp => (PlaybackEngineManager)sp.GetRequiredService<IPlaybackEngineManager>());
 			services.AddSingleton<IPlaybackPresentationManager, PlaybackPresentationManager>();
+			services.AddSingleton<WindowsMusicPlaybackEngine>();
 			services.AddSingleton<IPlaybackController, VideoPlaybackController>();
 			services.AddSingleton<IPlaybackService, PlaybackService>();
 			services.AddSingleton<Subject<IInboundSocketMessage>>();
