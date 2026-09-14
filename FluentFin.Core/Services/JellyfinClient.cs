@@ -53,14 +53,14 @@ public partial class JellyfinClient(ILogger<JellyfinClient> logger,
 		await _jellyfinApiClient.Sessions.Capabilities.Full.PostAsync(new ClientCapabilitiesDto
 		{
 			SupportsMediaControl = true,
-			PlayableMediaTypes = [MediaType.Video],
+			PlayableMediaTypes = [MediaType.Video, MediaType.Audio],
 			DeviceProfile = deviceProfileFactory.GetDeviceProfile(),
 			IconUrl = "https://github.com/insomniachi/FluentFin/raw/master/Installer/base-icon-transparent.png",
 			SupportedCommands = [
 				GeneralCommandType.DisplayMessage,
 			]
 		});
-		logger.LogInformation("Jellyfin capabilities registered. ElapsedMs={ElapsedMs}", elapsed.ElapsedMilliseconds);
+		logger.LogInformation("Jellyfin capabilities registered. PlayableMediaTypes={PlayableMediaTypes}, ElapsedMs={ElapsedMs}", "Video,Audio", elapsed.ElapsedMilliseconds);
 
 		RunInBackground(GetPlugins());
 		logger.LogInformation("Jellyfin plugin load started in background");

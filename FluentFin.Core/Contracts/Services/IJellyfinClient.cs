@@ -64,6 +64,8 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<MediaResponse?> GetMediaUrl(BaseItemDto dto, CancellationToken cancellationToken = default);
 
+		Task<IReadOnlyList<BaseItemDto>> GetPlayableAudioItems(BaseItemDto dto, CancellationToken cancellationToken = default);
+
 		Uri GetImage(BaseItemDto item, ImageInfo info);
 
 		Task<List<SessionInfoDto>> GetControllableSessions();
@@ -71,6 +73,8 @@ namespace FluentFin.Core.Contracts.Services
 		Uri GetTrickplayImage(BaseItemDto dto, int index, int resolution);
 
 		Task Playing(BaseItemDto dto);
+
+		Task ReportPlaybackStarted(PlaybackProgressInfo info);
 
 		Task Progress(PlaybackProgressInfo info);
 
@@ -81,6 +85,8 @@ namespace FluentFin.Core.Contracts.Services
 		Task Logout();
 
 		Task<int> BitrateTest();
+
+		Task<bool> RunAudioPlaybackSmokeAsync(Guid itemId, CancellationToken cancellationToken = default);
 
 		Task<List<RemoteSearchResult>> IdentifySeries(BaseItemDto dto, SeriesInfo info);
 
