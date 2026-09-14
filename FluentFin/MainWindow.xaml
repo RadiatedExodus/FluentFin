@@ -43,20 +43,31 @@
             Grid.Row="1"
             HorizontalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
+            Opacity="0"
+            RenderTransformOrigin="0.5,0.5"
             VerticalAlignment="Stretch"
             VerticalContentAlignment="Stretch"
             Canvas.ZIndex="8"
-            Visibility="Collapsed" />
+            Visibility="Collapsed">
+            <ContentControl.RenderTransform>
+                <CompositeTransform x:Name="MusicOverlayTransform" ScaleX="0.96" ScaleY="0.96" />
+            </ContentControl.RenderTransform>
+        </ContentControl>
 
         <ContentControl
             x:Name="MusicMiniPlayerPresenter"
             Grid.Row="1"
             HorizontalAlignment="Stretch"
             HorizontalContentAlignment="Stretch"
+            Opacity="0"
             VerticalAlignment="Bottom"
             VerticalContentAlignment="Stretch"
             Canvas.ZIndex="9"
-            Visibility="Collapsed" />
+            Visibility="Collapsed">
+            <ContentControl.RenderTransform>
+                <TranslateTransform x:Name="MusicMiniPlayerTransform" Y="96" />
+            </ContentControl.RenderTransform>
+        </ContentControl>
 
     </Grid>
 

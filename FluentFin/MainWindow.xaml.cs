@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
 using Windows.System;
 
 namespace FluentFin;
@@ -22,6 +23,7 @@ public sealed partial class MainWindow : WindowEx
 	private MusicQueuePanel? _musicQueuePanel;
 	private int _activeVideoRequestId;
 	private int _playbackPresentationUpdateQueued;
+	private int _musicPresentationAnimationVersion;
 
 	public IMainWindowViewModel ViewModel { get; } = App.GetService<IMainWindowViewModel>();
 
@@ -102,9 +104,12 @@ public sealed partial class MainWindow : WindowEx
 				_logger.LogInformation("Activating full-window video playback overlay. RequestId={RequestId}, ParameterType={ParameterType}",
 					state.RequestId,
 					state.Parameter?.GetType().FullName ?? "<null>");
+				Interlocked.Increment(ref _musicPresentationAnimationVersion);
 				PlaybackPresenter.Visibility = Visibility.Visible;
 				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
 				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
+				MusicOverlayPresenter.Content = null;
+				MusicMiniPlayerPresenter.Content = null;
 				RootFrame.Margin = new Thickness(0);
 
 				if (_activeVideoRequestId != state.RequestId)
@@ -132,7 +137,7 @@ public sealed partial class MainWindow : WindowEx
 
 			PlaybackPresenter.Content = null;
 			PlaybackPresenter.Visibility = Visibility.Collapsed;
-			UpdateMusicPresentation();
+			await UpdateMusicPresentationAsync();
 		}
 		catch (Exception ex)
 		{
@@ -140,41 +145,133 @@ public sealed partial class MainWindow : WindowEx
 		}
 	}
 
-	private void UpdateMusicPresentation()
+	private async Task UpdateMusicPresentationAsync()
 	{
+		var version = Interlocked.Increment(ref _musicPresentationAnimationVersion);
+
 		switch (_playbackPresentationManager.MusicMode)
 		{
 			case MusicPresentationMode.Expanded:
 				_musicExpandedPlayer ??= new MusicExpandedPlayer();
-				MusicOverlayPresenter.Content = _musicExpandedPlayer;
-				MusicOverlayPresenter.Visibility = Visibility.Visible;
-				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
 				RootFrame.Margin = new Thickness(0);
+				await HideMiniPlayerAsync(version);
+				await ShowOverlayAsync(_musicExpandedPlayer, version);
 				break;
 			case MusicPresentationMode.Queue:
 				_musicQueuePanel ??= new MusicQueuePanel();
 				_musicMiniPlayer ??= new MusicMiniPlayer();
-				MusicOverlayPresenter.Content = _musicQueuePanel;
-				MusicMiniPlayerPresenter.Content = _musicMiniPlayer;
-				MusicOverlayPresenter.Visibility = Visibility.Visible;
-				MusicMiniPlayerPresenter.Visibility = Visibility.Visible;
 				RootFrame.Margin = new Thickness(0, 0, 0, 96);
+				await ShowOverlayAsync(_musicQueuePanel, version);
+				await ShowMiniPlayerAsync(version);
 				break;
 			case MusicPresentationMode.Compact:
 				_musicMiniPlayer ??= new MusicMiniPlayer();
-				MusicOverlayPresenter.Content = null;
-				MusicMiniPlayerPresenter.Content = _musicMiniPlayer;
-				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
-				MusicMiniPlayerPresenter.Visibility = Visibility.Visible;
 				RootFrame.Margin = new Thickness(0, 0, 0, 96);
+				await HideOverlayAsync(version);
+				await ShowMiniPlayerAsync(version);
 				break;
 			default:
-				MusicOverlayPresenter.Content = null;
-				MusicMiniPlayerPresenter.Content = null;
-				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
-				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
 				RootFrame.Margin = new Thickness(0);
+				await HideOverlayAsync(version);
+				await HideMiniPlayerAsync(version);
 				break;
 		}
+	}
+
+	private async Task ShowMiniPlayerAsync(int version)
+	{
+		if (version != _musicPresentationAnimationVersion)
+		{
+			return;
+		}
+
+		MusicMiniPlayerPresenter.Content = _musicMiniPlayer;
+		MusicMiniPlayerPresenter.Visibility = Visibility.Visible;
+		MusicMiniPlayerPresenter.IsHitTestVisible = true;
+		await RunTransitionAsync(MusicMiniPlayerPresenter, MusicMiniPlayerTransform, 1, 0, scale: null, TimeSpan.FromMilliseconds(200));
+	}
+
+	private async Task HideMiniPlayerAsync(int version)
+	{
+		if (MusicMiniPlayerPresenter.Visibility is not Visibility.Visible)
+		{
+			MusicMiniPlayerPresenter.Content = null;
+			return;
+		}
+
+		MusicMiniPlayerPresenter.IsHitTestVisible = false;
+		await RunTransitionAsync(MusicMiniPlayerPresenter, MusicMiniPlayerTransform, 0, 96, scale: null, TimeSpan.FromMilliseconds(180));
+		if (version == _musicPresentationAnimationVersion)
+		{
+			MusicMiniPlayerPresenter.Content = null;
+			MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
+		}
+	}
+
+	private async Task ShowOverlayAsync(UIElement content, int version)
+	{
+		if (version != _musicPresentationAnimationVersion)
+		{
+			return;
+		}
+
+		MusicOverlayPresenter.Content = content;
+		MusicOverlayPresenter.Visibility = Visibility.Visible;
+		MusicOverlayPresenter.IsHitTestVisible = true;
+		await RunTransitionAsync(MusicOverlayPresenter, MusicOverlayTransform, 1, translateY: null, scale: 1, TimeSpan.FromMilliseconds(200));
+	}
+
+	private async Task HideOverlayAsync(int version)
+	{
+		if (MusicOverlayPresenter.Visibility is not Visibility.Visible)
+		{
+			MusicOverlayPresenter.Content = null;
+			return;
+		}
+
+		MusicOverlayPresenter.IsHitTestVisible = false;
+		await RunTransitionAsync(MusicOverlayPresenter, MusicOverlayTransform, 0, translateY: null, scale: 0.96, TimeSpan.FromMilliseconds(180));
+		if (version == _musicPresentationAnimationVersion)
+		{
+			MusicOverlayPresenter.Content = null;
+			MusicOverlayPresenter.Visibility = Visibility.Collapsed;
+		}
+	}
+
+	private static Task RunTransitionAsync(UIElement target, DependencyObject transform, double opacity, double? translateY, double? scale, TimeSpan duration)
+	{
+		var storyboard = new Storyboard();
+		storyboard.Children.Add(CreateDoubleAnimation(target, "Opacity", opacity, duration));
+
+		if (translateY is { } y)
+		{
+			storyboard.Children.Add(CreateDoubleAnimation(transform, "Y", y, duration));
+		}
+
+		if (scale is { } scaleValue)
+		{
+			storyboard.Children.Add(CreateDoubleAnimation(transform, "ScaleX", scaleValue, duration));
+			storyboard.Children.Add(CreateDoubleAnimation(transform, "ScaleY", scaleValue, duration));
+		}
+
+		var completion = new TaskCompletionSource();
+		storyboard.Completed += (_, _) => completion.TrySetResult();
+		storyboard.Begin();
+		return completion.Task;
+	}
+
+	private static DoubleAnimation CreateDoubleAnimation(DependencyObject target, string property, double to, TimeSpan duration)
+	{
+		var easing = new CubicEase { EasingMode = EasingMode.EaseOut };
+		var animation = new DoubleAnimation
+		{
+			To = to,
+			Duration = new Duration(duration),
+			EasingFunction = easing,
+			EnableDependentAnimation = true
+		};
+		Storyboard.SetTarget(animation, target);
+		Storyboard.SetTargetProperty(animation, property);
+		return animation;
 	}
 }
