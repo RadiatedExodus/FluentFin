@@ -5,6 +5,7 @@ using FluentFin.Core.Services;
 using FluentFin.Core.Settings;
 using FluentFin.Core.ViewModels;
 using FluentFin.ViewModels;
+using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -17,18 +18,21 @@ public class DefaultActivationHandler : ActivationHandler<LaunchActivatedEventAr
 	private readonly INavigationService _mainNavigationService;
 	private readonly ISettings _settings;
 	private readonly IJellyfinAuthenticationService _jellyfinAuthenticationService;
+	private readonly IJellyfinClient _jellyfinClient;
 	private readonly ILogger<DefaultActivationHandler> _logger;
 
 	public DefaultActivationHandler([FromKeyedServices(NavigationRegions.InitialSetup)] INavigationService navigationService,
 									INavigationService mainNavigationService,
 									ISettings settings,
 									IJellyfinAuthenticationService jellyfinAuthenticationService,
+									IJellyfinClient jellyfinClient,
 									ILogger<DefaultActivationHandler> logger)
 	{
 		_navigationService = navigationService;
 		_mainNavigationService = mainNavigationService;
 		_settings = settings;
 		_jellyfinAuthenticationService = jellyfinAuthenticationService;
+		_jellyfinClient = jellyfinClient;
 		_logger = logger;
 		_settings.ListenToChanges();
 	}
@@ -61,8 +65,11 @@ public class DefaultActivationHandler : ActivationHandler<LaunchActivatedEventAr
 				var cmdArgs = Environment.GetCommandLineArgs();
 				if(cmdArgs.Length == 2 && Guid.TryParse(cmdArgs[1], out var libraryId))
 				{
-					var libraryNavigated = _mainNavigationService.NavigateTo<LibraryViewModel>(libraryId);
-					_logger.LogInformation("Command-line library navigation requested. LibraryId={LibraryId}, Navigated={Navigated}", libraryId, libraryNavigated);
+					var library = await _jellyfinClient.GetItem(libraryId);
+					var libraryNavigated = library?.CollectionType is BaseItemDto_CollectionType.Music
+						? _mainNavigationService.NavigateTo<MusicAlbumListViewModel>(GlobalCommands.CreateMusicLibraryAlbumListParameter(library))
+						: _mainNavigationService.NavigateTo<LibraryViewModel>(libraryId);
+					_logger.LogInformation("Command-line library navigation requested. LibraryId={LibraryId}, CollectionType={CollectionType}, Navigated={Navigated}", libraryId, library?.CollectionType, libraryNavigated);
 				}
 			}
 			else

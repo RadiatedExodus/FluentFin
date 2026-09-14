@@ -16,10 +16,12 @@ public partial class LibraryViewModel : ObservableObject, INavigationAware
 	private BaseItemDto? _library;
 	private CancellationTokenSource? _loadCts;
 	private readonly ILogger<LibraryViewModel> _logger;
+	private readonly INavigationServiceCore _navigationService;
 
-	public LibraryViewModel(IJellyfinClient jellyfinClient, ILogger<LibraryViewModel> logger)
+	public LibraryViewModel(IJellyfinClient jellyfinClient, INavigationServiceCore navigationService, ILogger<LibraryViewModel> logger)
 	{
 		JellyfinClient = jellyfinClient;
+		_navigationService = navigationService;
 		_logger = logger;
 
 		Filter.Changed += (_, _) => ReloadFromFirstPage();
@@ -89,6 +91,11 @@ public partial class LibraryViewModel : ObservableObject, INavigationAware
 		_logger.LogInformation("LibraryViewModel OnNavigatedTo started. ParameterType={ParameterType}", parameter?.GetType().FullName ?? "<null>");
 		if (parameter is BaseItemDto libraryDto)
 		{
+			if (RedirectMusicLibrary(libraryDto))
+			{
+				return;
+			}
+
 			await Initialize(libraryDto);
 		}
 		else if(parameter is Guid id)
@@ -99,12 +106,30 @@ public partial class LibraryViewModel : ObservableObject, INavigationAware
 				_logger.LogWarning("LibraryViewModel could not resolve library id. LibraryId={LibraryId}", id);
 				return;
 			}
+
+			if (RedirectMusicLibrary(dto))
+			{
+				return;
+			}
+
 			await Initialize(dto);
 		}
 		else
 		{
 			_logger.LogWarning("LibraryViewModel received unsupported navigation parameter. ParameterType={ParameterType}", parameter?.GetType().FullName ?? "<null>");
 		}
+	}
+
+	private bool RedirectMusicLibrary(BaseItemDto dto)
+	{
+		if (dto.Type is BaseItemDto_Type.CollectionFolder && dto.CollectionType is BaseItemDto_CollectionType.Music)
+		{
+			_logger.LogInformation("Redirecting music library from generic library page to album list. LibraryId={LibraryId}, LibraryName={LibraryName}", dto.Id, dto.Name);
+			_navigationService.NavigateTo<MusicAlbumListViewModel>(GlobalCommands.CreateMusicLibraryAlbumListParameter(dto), true);
+			return true;
+		}
+
+		return false;
 	}
 
 	private async Task Initialize(BaseItemDto dto)

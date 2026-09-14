@@ -17,7 +17,7 @@ public partial class MusicAlbumListViewModel(
 {
 	private const int PageSize = 100;
 	private CancellationTokenSource? _loadCts;
-	private MusicAlbumCategoryListParameter _parameter = new("Albums", MusicAlbumCategoryKind.RecentlyAdded, null);
+	private MusicAlbumCategoryListParameter _parameter = new("Albums", MusicAlbumCategoryKind.LibraryAlbums, null);
 
 	public ObservableCollection<BaseItemViewModel> Albums { get; } = [];
 
@@ -45,10 +45,30 @@ public partial class MusicAlbumListViewModel(
 
 	public async Task OnNavigatedTo(object parameter)
 	{
-		_parameter = parameter as MusicAlbumCategoryListParameter ?? new("Recently added", MusicAlbumCategoryKind.RecentlyAdded, null);
+		_parameter = parameter switch
+		{
+			MusicAlbumCategoryListParameter categoryParameter => categoryParameter,
+			BaseItemDto { Id: { } id, Name: not null } library => new MusicAlbumCategoryListParameter(library.Name!, MusicAlbumCategoryKind.LibraryAlbums, id),
+			Guid id => await CreateLibraryAlbumParameter(id),
+			_ => new MusicAlbumCategoryListParameter("Albums", MusicAlbumCategoryKind.LibraryAlbums, null)
+		};
 		Title = _parameter.Title;
 		SelectedPage = 0;
 		await LoadPage();
+	}
+
+	private async Task<MusicAlbumCategoryListParameter> CreateLibraryAlbumParameter(Guid id)
+	{
+		try
+		{
+			var library = await jellyfinClient.GetItem(id);
+			return new MusicAlbumCategoryListParameter(library?.Name ?? "Albums", MusicAlbumCategoryKind.LibraryAlbums, id);
+		}
+		catch (Exception ex)
+		{
+			logger.LogWarning(ex, "Music album list could not resolve library title. LibraryId={LibraryId}", id);
+			return new MusicAlbumCategoryListParameter("Albums", MusicAlbumCategoryKind.LibraryAlbums, id);
+		}
 	}
 
 	[RelayCommand]
@@ -76,7 +96,7 @@ public partial class MusicAlbumListViewModel(
 
 		try
 		{
-			var query = MusicLibraryViewModel.CreateRecentlyAddedAlbumsQuery(_parameter.ParentId, SelectedPage * PageSize, PageSize);
+			var query = CreateAlbumListQuery(_parameter, SelectedPage * PageSize, PageSize);
 			logger.LogInformation("Music album category page load started. Category={Category}, ParentId={ParentId}, SelectedPage={SelectedPage}, StartIndex={StartIndex}",
 				_parameter.Kind,
 				_parameter.ParentId,
@@ -120,4 +140,20 @@ public partial class MusicAlbumListViewModel(
 			IsLoading = false;
 		}
 	}
+
+	private static ItemQuery CreateAlbumListQuery(MusicAlbumCategoryListParameter parameter, int startIndex, int limit) =>
+		parameter.Kind switch
+		{
+			MusicAlbumCategoryKind.RecentlyAdded => MusicLibraryViewModel.CreateRecentlyAddedAlbumsQuery(parameter.ParentId, startIndex, limit),
+			_ => new ItemQuery
+			{
+				ParentId = parameter.ParentId,
+				Recursive = true,
+				StartIndex = startIndex,
+				Limit = limit,
+				SortBy = ItemSortBy.Name,
+				SortOrder = SortOrder.Ascending,
+				IncludeItemTypes = [BaseItemKind.MusicAlbum]
+			}
+		};
 }

@@ -26,7 +26,7 @@ public partial class LibrariesLandingPageViewModel(IJellyfinClient jellyfinClien
 	{
 		if (library.CollectionType is BaseItemDto_CollectionType.Music)
 		{
-			navigationService.NavigateTo<MusicLibraryViewModel>(library);
+			navigationService.NavigateTo<MusicAlbumListViewModel>(GlobalCommands.CreateMusicLibraryAlbumListParameter(library));
 			return;
 		}
 

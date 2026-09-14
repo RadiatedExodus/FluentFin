@@ -103,7 +103,7 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 				navigationService.NavigateTo<MusicAlbumViewModel>(dto);
 				break;
 			case BaseItemDto_Type.CollectionFolder when dto.CollectionType is BaseItemDto_CollectionType.Music:
-				navigationService.NavigateTo<MusicLibraryViewModel>(dto);
+				navigationService.NavigateTo<MusicAlbumListViewModel>(CreateMusicLibraryAlbumListParameter(dto));
 				break;
 			default:
 				break;
@@ -132,7 +132,9 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 
 		var folder = new CustomNavigationViewItem
 		{
-			Key = typeof(LibraryViewModel).FullName!,
+			Key = library.CollectionType.Value is BaseItemDto_CollectionType.Music
+				? typeof(MusicAlbumListViewModel).FullName!
+				: typeof(LibraryViewModel).FullName!,
 			Name = library.Name!,
 			Parameter = library.Id.Value,
 			Glyph = library.CollectionType.Value switch
@@ -203,4 +205,6 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 	private static bool IsMusicItem(BaseItemDto dto) =>
 		dto.Type is BaseItemDto_Type.Audio or BaseItemDto_Type.MusicAlbum or BaseItemDto_Type.Playlist;
 
+	public static MusicAlbumCategoryListParameter CreateMusicLibraryAlbumListParameter(BaseItemDto library) =>
+		new(library.Name ?? "Albums", MusicAlbumCategoryKind.LibraryAlbums, library.Id);
 }

@@ -2,7 +2,8 @@ namespace FluentFin.Core.ViewModels;
 
 public enum MusicAlbumCategoryKind
 {
-	RecentlyAdded
+	RecentlyAdded,
+	LibraryAlbums
 }
 
 public sealed record MusicAlbumCategoryListParameter(
