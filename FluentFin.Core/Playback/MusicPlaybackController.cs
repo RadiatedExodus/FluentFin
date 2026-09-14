@@ -473,6 +473,13 @@ public sealed class MusicPlaybackController(
 		{
 			logger.LogInformation("Music media ended. ItemId={ItemId}, RepeatMode={RepeatMode}", _currentItem?.JellyfinId, RepeatMode);
 			var next = _queuePolicy?.MoveNext(automatic: true);
+			if (next is null)
+			{
+				logger.LogInformation("Music queue exhausted after media ended. Stopping playback. ItemId={ItemId}", _currentItem?.JellyfinId);
+				await PlaybackService.StopAsync(CancellationToken.None);
+				return;
+			}
+
 			await MoveToCurrentQueueItem(next, restartEngine: true, CancellationToken.None);
 		}
 		catch (Exception ex)

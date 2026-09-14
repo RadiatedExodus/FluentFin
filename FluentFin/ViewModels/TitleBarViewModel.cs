@@ -106,8 +106,20 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 	{
 		if (e.PropertyName is nameof(IPlaybackPresentationManager.Mode) or nameof(IPlaybackPresentationManager.MusicMode) or nameof(IPlaybackPresentationManager.HasActivePresentation))
 		{
-			RefreshCanGoBack();
+			EnqueueRefreshCanGoBack();
 		}
+	}
+
+	private void EnqueueRefreshCanGoBack()
+	{
+		var dispatcherQueue = App.MainWindow.DispatcherQueue;
+		if (dispatcherQueue.HasThreadAccess)
+		{
+			RefreshCanGoBack();
+			return;
+		}
+
+		dispatcherQueue.TryEnqueue(RefreshCanGoBack);
 	}
 
 	private void RefreshCanGoBack()
