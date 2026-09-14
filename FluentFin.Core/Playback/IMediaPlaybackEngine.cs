@@ -64,6 +64,8 @@ public interface IPlaybackSpeedControl
 
 public interface IQueuedPlaybackEngine : IMediaPlaybackEngine
 {
+	event EventHandler<QueueItemChangedEventArgs>? CurrentItemChanged;
+
 	Task SetQueueAsync(IReadOnlyList<MediaSource> sources, int startIndex, CancellationToken cancellationToken = default);
 	Task SkipNextAsync(CancellationToken cancellationToken = default);
 	Task SkipPreviousAsync(CancellationToken cancellationToken = default);

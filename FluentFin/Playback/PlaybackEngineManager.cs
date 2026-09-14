@@ -1,12 +1,14 @@
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.Playback;
 using FluentFin.Core.Settings;
+using FluentFin.MediaPlayers;
 using Microsoft.Extensions.Logging;
 
 namespace FluentFin.Playback;
 
 public sealed class PlaybackEngineManager(
 	ISettings settings,
+	WindowsMusicPlaybackEngine musicEngine,
 	ILogger<PlaybackEngineManager> logger) : IPlaybackEngineManager
 	, IHostedPlaybackEngineRegistry
 {
@@ -28,7 +30,9 @@ public sealed class PlaybackEngineManager(
 
 		if (kind is PlaybackKind.Music)
 		{
-			throw new NotSupportedException("Music playback engines are not implemented yet.");
+			logger.LogInformation("Activating Windows music playback engine. EngineId={EngineId}", musicEngine.Id);
+			ActiveEngine = musicEngine;
+			return Task.FromResult<IMediaPlaybackEngine>(musicEngine);
 		}
 
 		if (_registeredEngine is null)

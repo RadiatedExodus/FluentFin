@@ -12,8 +12,9 @@ public sealed class PlaybackQueue
 
 	public void Replace(IReadOnlyList<PlaybackItem> items, int startIndex)
 	{
+		var replacement = items.ToList();
 		_items.Clear();
-		_items.AddRange(items);
+		_items.AddRange(replacement);
 		CurrentIndex = _items.Count == 0 ? -1 : Math.Clamp(startIndex, 0, _items.Count - 1);
 	}
 
@@ -37,6 +38,45 @@ public sealed class PlaybackQueue
 
 		CurrentIndex--;
 		return Current;
+	}
+
+	public void Add(PlaybackItem item)
+	{
+		_items.Add(item);
+		if (CurrentIndex < 0)
+		{
+			CurrentIndex = 0;
+		}
+	}
+
+	public void AddRange(IEnumerable<PlaybackItem> items)
+	{
+		var hadItems = _items.Count > 0;
+		_items.AddRange(items);
+		if (!hadItems && _items.Count > 0)
+		{
+			CurrentIndex = 0;
+		}
+	}
+
+	public void InsertRange(int index, IEnumerable<PlaybackItem> items)
+	{
+		var insertIndex = Math.Clamp(index, 0, _items.Count);
+		var inserted = items.ToList();
+		if (inserted.Count == 0)
+		{
+			return;
+		}
+
+		_items.InsertRange(insertIndex, inserted);
+		if (CurrentIndex < 0)
+		{
+			CurrentIndex = 0;
+		}
+		else if (insertIndex <= CurrentIndex)
+		{
+			CurrentIndex += inserted.Count;
+		}
 	}
 
 	public void Clear()

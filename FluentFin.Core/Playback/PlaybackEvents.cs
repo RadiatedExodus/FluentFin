@@ -20,3 +20,8 @@ public sealed class PlaybackErrorEventArgs(Exception? exception, string? message
 	public Exception? Exception { get; } = exception;
 	public string? Message { get; } = message;
 }
+
+public sealed class QueueItemChangedEventArgs(int index) : EventArgs
+{
+	public int Index { get; } = index;
+}

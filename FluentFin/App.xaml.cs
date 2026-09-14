@@ -120,6 +120,9 @@ public partial class App : Application
 			services.AddSingleton<IPlaybackPresentationManager, PlaybackPresentationManager>();
 			services.AddSingleton<WindowsMusicPlaybackEngine>();
 			services.AddSingleton<IPlaybackController, VideoPlaybackController>();
+			services.AddSingleton<MusicPlaybackController>();
+			services.AddSingleton<IMusicPlaybackController>(sp => sp.GetRequiredService<MusicPlaybackController>());
+			services.AddSingleton<IPlaybackController>(sp => sp.GetRequiredService<MusicPlaybackController>());
 			services.AddSingleton<IPlaybackService, PlaybackService>();
 			services.AddSingleton<Subject<IInboundSocketMessage>>();
 			services.AddSingleton<IObservable<IInboundSocketMessage>>(sp => sp.GetRequiredService<Subject<IInboundSocketMessage>>());

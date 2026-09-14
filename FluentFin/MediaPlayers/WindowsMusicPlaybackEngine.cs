@@ -62,6 +62,7 @@ public sealed class WindowsMusicPlaybackEngine : IQueuedPlaybackEngine, IPlaybac
 	public event EventHandler? MediaEnded;
 	public event EventHandler? MediaLoaded;
 	public event EventHandler<PlaybackErrorEventArgs>? PlaybackFailed;
+	public event EventHandler<QueueItemChangedEventArgs>? CurrentItemChanged;
 
 	public async Task OpenAsync(MediaSource source, CancellationToken cancellationToken = default)
 	{
@@ -261,6 +262,10 @@ public sealed class WindowsMusicPlaybackEngine : IQueuedPlaybackEngine, IPlaybac
 	{
 		var index = sender.Items.IndexOf(args.NewItem);
 		_logger.LogInformation("Windows music playback engine current item changed. NativeIndex={NativeIndex}", index);
+		if (index >= 0)
+		{
+			CurrentItemChanged?.Invoke(this, new QueueItemChangedEventArgs(index));
+		}
 	}
 
 	private void OnItemFailed(MediaPlaybackList sender, MediaPlaybackItemFailedEventArgs args)
