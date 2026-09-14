@@ -55,8 +55,8 @@
             </Grid>
 
             <controls:MusicAlbumCategoryRail
-                Albums="{x:Bind ViewModel.ArtistAlbums, Mode=OneWay}"
                 HeaderCommand="{x:Bind ViewModel.ShowArtistAlbumsCommand, Mode=OneWay}"
+                Items="{x:Bind ViewModel.ArtistAlbums, Mode=OneWay}"
                 JellyfinClient="{x:Bind ViewModel.JellyfinClient, Mode=OneWay}"
                 Title="Albums" />
 

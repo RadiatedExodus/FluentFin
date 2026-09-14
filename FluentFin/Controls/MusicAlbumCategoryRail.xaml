@@ -5,52 +5,104 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:c="using:FluentFin.Converters"
     xmlns:controls="using:FluentFin.Controls"
+    xmlns:ctkl="using:CommunityToolkit.Labs.WinUI"
     xmlns:jm="using:Jellyfin.Sdk.Generated.Models"
+    xmlns:ui="using:CommunityToolkit.WinUI"
     xmlns:vm="using:FluentFin.Core.ViewModels"
     x:Name="Root">
 
-    <StackPanel Spacing="12">
-        <Button
-            Padding="0"
-            HorizontalAlignment="Left"
-            Background="Transparent"
-            BorderThickness="0"
-            Command="{x:Bind HeaderCommand, Mode=OneWay}"
-            Style="{ThemeResource BareButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock
-                    Style="{ThemeResource SubtitleTextBlockStyle}"
-                    Text="{x:Bind Title, Mode=OneWay}" />
-                <FontIcon
-                    FontSize="14"
-                    Glyph="&#xE974;" />
-            </StackPanel>
-        </Button>
+    <Grid RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <ScrollViewer
-            HorizontalScrollBarVisibility="Auto"
-            HorizontalScrollMode="Enabled"
-            VerticalScrollBarVisibility="Disabled"
-            VerticalScrollMode="Disabled">
-            <ItemsRepeater ItemsSource="{x:Bind Albums, Mode=OneWay}">
-                <ItemsRepeater.ItemTemplate>
-                    <DataTemplate x:DataType="vm:BaseItemViewModel">
-                        <ItemContainer
-                            Width="190"
-                            Margin="0,0,12,0"
-                            CornerRadius="{StaticResource ControlCornerRadius}"
-                            Style="{StaticResource BareItemContainerStyle}">
-                            <controls:MusicAlbumCard
-                                ArtworkSize="190"
-                                JellyfinClient="{Binding ElementName=Root, Path=JellyfinClient}"
-                                Model="{x:Bind}" />
-                        </ItemContainer>
-                    </DataTemplate>
-                </ItemsRepeater.ItemTemplate>
-                <ItemsRepeater.Layout>
-                    <StackLayout Orientation="Horizontal" />
-                </ItemsRepeater.Layout>
-            </ItemsRepeater>
-        </ScrollViewer>
-    </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                VerticalAlignment="Center"
+                Style="{StaticResource TitleTextBlockStyle}"
+                Text="{x:Bind Title, Mode=OneWay}" />
+
+            <Button
+                Grid.Column="1"
+                Width="40"
+                Height="40"
+                HorizontalAlignment="Right"
+                Command="{x:Bind HeaderCommand, Mode=OneWay}"
+                CommandParameter="{x:Bind HeaderCommandParameter, Mode=OneWay}"
+                CornerRadius="25"
+                IsEnabled="{x:Bind c:Converters.BooleanNot(IsLoading), Mode=OneWay}"
+                ToolTipService.ToolTip="View all">
+                <FontIcon FontSize="12" Glyph="&#xEDDA;" />
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer
+                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollMode="Enabled"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled">
+                <ItemsRepeater ItemsSource="{x:Bind Items, Mode=OneWay}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="vm:BaseItemViewModel">
+                            <ItemContainer
+                                Width="190"
+                                Margin="0,0,12,0"
+                                CornerRadius="{StaticResource ControlCornerRadius}"
+                                Style="{StaticResource BareItemContainerStyle}">
+                                <controls:MusicAlbumCard
+                                    ArtworkSize="190"
+                                    JellyfinClient="{Binding ElementName=Root, Path=JellyfinClient}"
+                                    Model="{x:Bind}" />
+                            </ItemContainer>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                    <ItemsRepeater.Layout>
+                        <StackLayout Orientation="Horizontal" />
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </ScrollViewer>
+
+            <ScrollViewer
+                HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Disabled"
+                VerticalScrollMode="Disabled"
+                Visibility="{x:Bind c:Converters.BooleanToVisibility(IsLoading), Mode=OneWay}">
+                <ItemsRepeater ItemsSource="{x:Bind c:Converters.GetDummyItemSource(6)}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel
+                                Width="190"
+                                Margin="0,0,12,0"
+                                Spacing="8">
+                                <ctkl:Shimmer
+                                    Width="190"
+                                    Height="190"
+                                    HorizontalAlignment="Left"
+                                    ui:VisualExtensions.NormalizedCenterPoint="0.5, 0.5" />
+                                <ctkl:Shimmer
+                                    Width="150"
+                                    Height="18"
+                                    HorizontalAlignment="Left" />
+                                <ctkl:Shimmer
+                                    Width="110"
+                                    Height="14"
+                                    HorizontalAlignment="Left" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                    <ItemsRepeater.Layout>
+                        <StackLayout Orientation="Horizontal" />
+                    </ItemsRepeater.Layout>
+                </ItemsRepeater>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
 </UserControl>

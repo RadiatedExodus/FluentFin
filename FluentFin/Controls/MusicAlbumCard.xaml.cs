@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.WinUI;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.ViewModels;
+using Jellyfin.Sdk.Generated.Models;
 using Microsoft.UI.Xaml.Controls;
 
 namespace FluentFin.Controls;
@@ -36,7 +37,14 @@ public sealed partial class MusicAlbumCard : UserControl
 			return;
 		}
 
-		App.Commands.DisplayDto(Model.Dto);
+		if (Model.Dto.Type is BaseItemDto_Type.Audio or BaseItemDto_Type.Playlist)
+		{
+			App.Commands.PlayDtoCommand.Execute(Model.Dto);
+		}
+		else
+		{
+			App.Commands.DisplayDto(Model.Dto);
+		}
 		e.Handled = true;
 	}
 

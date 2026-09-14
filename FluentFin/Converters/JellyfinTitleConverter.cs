@@ -50,6 +50,14 @@ public partial class JellyfinSubtitleConverter : IValueConverter
 		{
 			return string.Join(", ", new[] { bid.AlbumArtist, bid.ProductionYear?.ToString() }.Where(x => !string.IsNullOrWhiteSpace(x)));
 		}
+		if (bid.Type == BaseItemDto_Type.Audio)
+		{
+			return string.Join(", ", new[] { string.Join(", ", bid.Artists ?? []), bid.Album }.Where(x => !string.IsNullOrWhiteSpace(x)));
+		}
+		if (bid.Type == BaseItemDto_Type.Playlist)
+		{
+			return "Playlist";
+		}
 
 		return "";
 	}

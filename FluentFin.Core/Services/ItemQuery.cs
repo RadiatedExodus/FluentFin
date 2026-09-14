@@ -20,4 +20,6 @@ public sealed class ItemQuery
 	public IReadOnlyList<Guid> ArtistIds { get; init; } = [];
 	public IReadOnlyList<Guid> AlbumArtistIds { get; init; } = [];
 	public Guid? PlaylistId { get; init; }
+	public bool? IsFavorite { get; init; }
+	public bool? IsPlayed { get; init; }
 }

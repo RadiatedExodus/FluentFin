@@ -147,7 +147,14 @@ public partial class MusicAlbumListViewModel(
 	private static ItemQuery CreateAlbumListQuery(MusicAlbumCategoryListParameter parameter, int startIndex, int limit) =>
 		parameter.Kind switch
 		{
-			MusicAlbumCategoryKind.RecentlyAdded => MusicLibraryViewModel.CreateRecentlyAddedAlbumsQuery(parameter.ParentId, startIndex, limit),
+			MusicAlbumCategoryKind.RecentlyAdded
+				or MusicAlbumCategoryKind.RecentlyReleasedAlbums
+				or MusicAlbumCategoryKind.Playlists
+				or MusicAlbumCategoryKind.RecentlyPlayedSongs
+				or MusicAlbumCategoryKind.RecentlyPlayedAlbums
+				or MusicAlbumCategoryKind.MostPlayedSongs
+				or MusicAlbumCategoryKind.FavoriteAlbums
+				or MusicAlbumCategoryKind.FavoriteSongs => MusicLibraryViewModel.CreateCategoryQuery(parameter.Kind, parameter.ParentId, startIndex, limit),
 			MusicAlbumCategoryKind.ArtistAlbums => CreateArtistAlbumsQuery(parameter.ParentId, parameter.ArtistId, startIndex, limit, useAlbumArtistIds: true),
 			_ => new ItemQuery
 			{

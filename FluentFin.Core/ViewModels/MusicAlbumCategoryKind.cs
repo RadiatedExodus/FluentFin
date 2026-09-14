@@ -3,6 +3,13 @@ namespace FluentFin.Core.ViewModels;
 public enum MusicAlbumCategoryKind
 {
 	RecentlyAdded,
+	RecentlyReleasedAlbums,
+	Playlists,
+	RecentlyPlayedSongs,
+	RecentlyPlayedAlbums,
+	MostPlayedSongs,
+	FavoriteAlbums,
+	FavoriteSongs,
 	LibraryAlbums,
 	ArtistAlbums
 }

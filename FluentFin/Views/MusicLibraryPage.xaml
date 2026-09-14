@@ -6,20 +6,30 @@
     xmlns:controls="using:FluentFin.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:FluentFin.Core.ViewModels"
+    x:Name="Page"
     Margin="{StaticResource MediumLeftTopRightBottomMargin}"
     mc:Ignorable="d">
 
-    <ScrollViewer>
-        <StackPanel Spacing="24">
-            <TextBlock
-                Style="{ThemeResource TitleTextBlockStyle}"
-                Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
-
-            <controls:MusicAlbumCategoryRail
-                Albums="{x:Bind ViewModel.RecentlyAddedAlbums, Mode=OneWay}"
-                HeaderCommand="{x:Bind ViewModel.ShowRecentlyAddedAlbumsCommand, Mode=OneWay}"
-                JellyfinClient="{x:Bind ViewModel.JellyfinClient, Mode=OneWay}"
-                Title="Recently added" />
+    <ScrollViewer VerticalScrollBarVisibility="Hidden">
+        <StackPanel Spacing="20">
+            <ItemsRepeater ItemsSource="{x:Bind ViewModel.Categories, Mode=OneWay}">
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MusicCategoryViewModel">
+                        <controls:MusicAlbumCategoryRail
+                            Margin="0,0,0,4"
+                            HeaderCommand="{x:Bind HeaderCommand, Mode=OneWay}"
+                            HeaderCommandParameter="{x:Bind}"
+                            IsLoading="{x:Bind IsLoading, Mode=OneWay}"
+                            Items="{x:Bind Items, Mode=OneWay}"
+                            JellyfinClient="{Binding ElementName=Page, Path=ViewModel.JellyfinClient}"
+                            Title="{x:Bind Title, Mode=OneWay}" />
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+                <ItemsRepeater.Layout>
+                    <StackLayout Orientation="Vertical" Spacing="20" />
+                </ItemsRepeater.Layout>
+            </ItemsRepeater>
         </StackPanel>
     </ScrollViewer>
 </Page>

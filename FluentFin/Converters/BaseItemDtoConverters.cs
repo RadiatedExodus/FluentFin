@@ -56,6 +56,14 @@ public static class BaseItemDtoConverters
 		{
 			return string.Join(", ", new[] { dto.AlbumArtist, dto.ProductionYear?.ToString() }.Where(x => !string.IsNullOrWhiteSpace(x)));
 		}
+		if (dto.Type == BaseItemDto_Type.Audio)
+		{
+			return string.Join(", ", new[] { string.Join(", ", dto.Artists ?? []), dto.Album }.Where(x => !string.IsNullOrWhiteSpace(x)));
+		}
+		if (dto.Type == BaseItemDto_Type.Playlist)
+		{
+			return "Playlist";
+		}
 
 		return "";
 	}

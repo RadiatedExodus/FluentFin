@@ -61,6 +61,7 @@ public static class Converters
 	public static Visibility VisibleIfMoreThanOne(ObservableCollection<PlaylistItem> items) => VisibleIfMoreThanOne<PlaylistItem>(items);
 	public static Visibility VisibleIfMoreThanOne<T>(IList<T> values) => values.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 	public static Visibility BooleanToVisibility(bool? value) => value is true ? Visibility.Visible : Visibility.Collapsed;
+	public static bool BooleanNot(bool? value) => value is not true;
 	public static string JoinStrings(IEnumerable<string>? values) => values is null ? "" : string.Join(", ", values.Where(x => !string.IsNullOrWhiteSpace(x)));
 
 	public static string TimeSpanToString(TimeSpan ts)

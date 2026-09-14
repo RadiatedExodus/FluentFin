@@ -40,7 +40,7 @@ public partial class JellyfinClient
 	public async Task<PagedResult<BaseItemDto>?> GetItems(ItemQuery itemQuery, CancellationToken cancellationToken = default)
 	{
 		var elapsed = Stopwatch.StartNew();
-		logger.LogInformation("Jellyfin GetItems query started. ParentId={ParentId}, PlaylistId={PlaylistId}, StartIndex={StartIndex}, Limit={Limit}, SortBy={SortBy}, SortOrder={SortOrder}, SearchTerm={SearchTerm}, IncludeItemTypes={IncludeItemTypes}, MediaTypes={MediaTypes}, Genres={Genres}, Tags={Tags}, OfficialRatings={OfficialRatings}, Years={Years}",
+		logger.LogInformation("Jellyfin GetItems query started. ParentId={ParentId}, PlaylistId={PlaylistId}, StartIndex={StartIndex}, Limit={Limit}, SortBy={SortBy}, SortOrder={SortOrder}, SearchTerm={SearchTerm}, IncludeItemTypes={IncludeItemTypes}, MediaTypes={MediaTypes}, Genres={Genres}, Tags={Tags}, OfficialRatings={OfficialRatings}, Years={Years}, IsFavorite={IsFavorite}, IsPlayed={IsPlayed}",
 			itemQuery.ParentId,
 			itemQuery.PlaylistId,
 			itemQuery.StartIndex,
@@ -53,7 +53,9 @@ public partial class JellyfinClient
 			string.Join(",", itemQuery.Genres),
 			string.Join(",", itemQuery.Tags),
 			string.Join(",", itemQuery.OfficialRatings),
-			string.Join(",", itemQuery.Years));
+			string.Join(",", itemQuery.Years),
+			itemQuery.IsFavorite,
+			itemQuery.IsPlayed);
 		try
 		{
 			if (itemQuery.PlaylistId is { } playlistId)
@@ -83,6 +85,9 @@ public partial class JellyfinClient
 				query.Years = itemQuery.Years.Count > 0 ? [.. itemQuery.Years] : null;
 				query.Tags = itemQuery.Tags.Count > 0 ? [.. itemQuery.Tags] : null;
 				query.OfficialRatings = itemQuery.OfficialRatings.Count > 0 ? [.. itemQuery.OfficialRatings] : null;
+				query.IsFavorite = itemQuery.IsFavorite;
+				query.IsPlayed = itemQuery.IsPlayed;
+				query.EnableUserData = itemQuery.IsFavorite is not null || itemQuery.IsPlayed is not null ? true : null;
 			}, cancellationToken);
 
 			if (response is null)
