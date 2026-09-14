@@ -21,115 +21,136 @@
         </LinearGradientBrush>
     </UserControl.Resources>
 
-    <Grid Padding="32" Background="{StaticResource MusicPresentationBackgroundBrush}">
-        <StackPanel
-            MaxWidth="720"
+    <Grid Padding="48" Background="{StaticResource MusicPresentationBackgroundBrush}">
+        <Grid
+            MaxWidth="1160"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            Spacing="20">
+            ColumnSpacing="56">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="560" />
+            </Grid.ColumnDefinitions>
+
             <Button
-                Width="360"
-                Height="360"
+                Width="480"
+                Height="480"
+                MaxWidth="520"
+                MaxHeight="520"
                 Padding="0"
                 HorizontalAlignment="Center"
+                VerticalAlignment="Center"
                 Command="{x:Bind ViewModel.OpenAlbumCommand, Mode=OneWay}"
                 Style="{ThemeResource BareButtonStyle}">
                 <Image Source="{x:Bind ViewModel.Artwork, Mode=OneWay}" Stretch="UniformToFill" />
             </Button>
 
-            <StackPanel HorizontalAlignment="Center" Spacing="4">
-                <TextBlock
-                    HorizontalAlignment="Center"
-                    Style="{ThemeResource TitleTextBlockStyle}"
-                    Text="{x:Bind ViewModel.TrackTitle, Mode=OneWay}"
-                    TextAlignment="Center"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    HorizontalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Style="{ThemeResource SubtitleTextBlockStyle}"
-                    Text="{x:Bind ViewModel.ArtistText, Mode=OneWay}"
-                    TextAlignment="Center" />
-                <TextBlock
-                    HorizontalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="{x:Bind ViewModel.AlbumTitle, Mode=OneWay}"
-                    TextAlignment="Center" />
-            </StackPanel>
-
-            <Grid ColumnSpacing="10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="56" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="56" />
-                </Grid.ColumnDefinitions>
-                <TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.PositionText, Mode=OneWay}" />
-                <Slider
-                    x:Name="ProgressSlider"
-                    Grid.Column="1"
-                    Maximum="{x:Bind ViewModel.DurationSeconds, Mode=OneWay}"
-                    Value="{x:Bind ViewModel.PositionSeconds, Mode=OneWay}" />
-                <TextBlock
-                    Grid.Column="2"
-                    VerticalAlignment="Center"
-                    Text="{x:Bind ViewModel.DurationText, Mode=OneWay}" />
-            </Grid>
-
             <StackPanel
-                HorizontalAlignment="Center"
-                Orientation="Horizontal"
-                Spacing="14">
-                <Button Command="{x:Bind ViewModel.ToggleShuffleCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8B1;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Shuffle" />
-                <Button Command="{x:Bind ViewModel.PreviousCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE892;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Previous" />
-                <Button
-                    Width="64"
-                    Height="64"
-                    Command="{x:Bind ViewModel.TogglePlayPauseCommand, Mode=OneWay}"
-                    CornerRadius="32"
-                    Style="{ThemeResource AccentButtonStyle}"
-                    ToolTipService.ToolTip="Play/Pause">
-                    <Grid Width="28" Height="28">
-                        <ProgressRing
-                            Width="24"
-                            Height="24"
-                            Foreground="Black"
-                            IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
-                        <FontIcon
-                            FontSize="24"
-                            Glyph="{x:Bind ViewModel.PlayPauseGlyph, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.PlayPauseIconVisibility, Mode=OneWay}" />
-                    </Grid>
-                </Button>
-                <Button Command="{x:Bind ViewModel.StopCommand, Mode=OneWay}" Content="{ui:SymbolIcon Symbol=Stop}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Stop" />
-                <Button Command="{x:Bind ViewModel.NextCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE893;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Next" />
-                <Button Command="{x:Bind ViewModel.CycleRepeatModeCommand, Mode=OneWay}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="{x:Bind ViewModel.RepeatToolTip, Mode=OneWay}">
-                    <FontIcon FontSize="20" Glyph="{x:Bind ViewModel.RepeatGlyph, Mode=OneWay}" />
-                </Button>
-                <Button Command="{x:Bind ViewModel.OpenQueueCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8FD;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Queue" />
-            </StackPanel>
+                Grid.Column="1"
+                MaxWidth="560"
+                VerticalAlignment="Center"
+                Spacing="24">
+                <StackPanel Spacing="6">
+                    <TextBlock
+                        Style="{ThemeResource TitleTextBlockStyle}"
+                        Text="{x:Bind ViewModel.TrackTitle, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{ThemeResource SubtitleTextBlockStyle}"
+                        Text="{x:Bind ViewModel.ArtistText, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.AlbumTitle, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
 
-            <StackPanel
-                HorizontalAlignment="Center"
-                Orientation="Horizontal"
-                Spacing="10">
-                <FontIcon VerticalAlignment="Center" Glyph="&#xE767;" />
-                <Slider
-                    x:Name="VolumeSlider"
-                    Width="220"
-                    Maximum="100"
-                    Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}" />
-                <NumberBox
-                    x:Name="VolumeNumberBox"
-                    Width="80"
-                    Maximum="100"
-                    Minimum="0"
-                    SmallChange="1"
-                    SpinButtonPlacementMode="Compact"
-                    Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}"
-                    ValueChanged="VolumeNumberBox_ValueChanged" />
-                <TextBlock VerticalAlignment="Center" Text="%" />
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="56" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="56" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.PositionText, Mode=OneWay}" />
+                    <Slider
+                        x:Name="ProgressSlider"
+                        Grid.Column="1"
+                        Maximum="{x:Bind ViewModel.DurationSeconds, Mode=OneWay}"
+                        Value="{x:Bind ViewModel.PositionSeconds, Mode=OneWay}" />
+                    <TextBlock
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.DurationText, Mode=OneWay}" />
+                </Grid>
+
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="18">
+                    <Button Command="{x:Bind ViewModel.PreviousCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE892;, FontSize=22}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Previous" />
+                    <Button
+                        Width="68"
+                        Height="68"
+                        Command="{x:Bind ViewModel.TogglePlayPauseCommand, Mode=OneWay}"
+                        CornerRadius="34"
+                        Style="{ThemeResource AccentButtonStyle}"
+                        ToolTipService.ToolTip="Play/Pause">
+                        <Grid Width="30" Height="30">
+                            <ProgressRing
+                                Width="26"
+                                Height="26"
+                                Foreground="Black"
+                                IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+                            <FontIcon
+                                FontSize="26"
+                                Glyph="{x:Bind ViewModel.PlayPauseGlyph, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.PlayPauseIconVisibility, Mode=OneWay}" />
+                        </Grid>
+                    </Button>
+                    <Button Command="{x:Bind ViewModel.NextCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE893;, FontSize=22}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Next" />
+                </StackPanel>
+
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="18">
+                    <Button Command="{x:Bind ViewModel.ToggleShuffleCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8B1;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Shuffle" />
+                    <Button Command="{x:Bind ViewModel.CycleRepeatModeCommand, Mode=OneWay}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="{x:Bind ViewModel.RepeatToolTip, Mode=OneWay}">
+                        <FontIcon FontSize="20" Glyph="{x:Bind ViewModel.RepeatGlyph, Mode=OneWay}" />
+                    </Button>
+                    <Button Command="{x:Bind ViewModel.StopCommand, Mode=OneWay}" Content="{ui:SymbolIcon Symbol=Stop}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Stop" />
+                    <Button Command="{x:Bind ViewModel.OpenQueueCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8FD;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Queue" />
+                </StackPanel>
+
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="10">
+                    <FontIcon VerticalAlignment="Center" Glyph="&#xE767;" />
+                    <Slider
+                        x:Name="VolumeSlider"
+                        Width="280"
+                        Maximum="100"
+                        Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}" />
+                    <NumberBox
+                        x:Name="VolumeNumberBox"
+                        Width="80"
+                        Maximum="100"
+                        Minimum="0"
+                        SmallChange="1"
+                        SpinButtonPlacementMode="Compact"
+                        Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}"
+                        ValueChanged="VolumeNumberBox_ValueChanged" />
+                    <TextBlock VerticalAlignment="Center" Text="%" />
+                </StackPanel>
             </StackPanel>
-        </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>
