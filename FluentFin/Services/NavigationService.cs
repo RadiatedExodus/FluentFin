@@ -2,6 +2,8 @@
 using FluentFin.Contracts.Services;
 using FluentFin.Contracts.ViewModels;
 using FluentFin.Helpers;
+using FluentFin.Playback.Presentation;
+using FluentFin.ViewModels;
 using FluentFin.UI.Core.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
@@ -14,6 +16,7 @@ namespace FluentFin.Services;
 public class NavigationService : INavigationService
 {
 	private readonly IPageService _pageService;
+	private readonly IPlaybackPresentationManager _playbackPresentationManager;
 	private readonly ILogger<NavigationService> _logger;
 	private object? _lastParameterUsed;
 	private Frame? _frame;
@@ -44,9 +47,10 @@ public class NavigationService : INavigationService
 	[MemberNotNullWhen(true, nameof(Frame), nameof(_frame))]
 	public bool CanGoBack => Frame != null && Frame.CanGoBack;
 
-	public NavigationService(IPageService pageService, ILogger<NavigationService> logger)
+	public NavigationService(IPageService pageService, IPlaybackPresentationManager playbackPresentationManager, ILogger<NavigationService> logger)
 	{
 		_pageService = pageService;
+		_playbackPresentationManager = playbackPresentationManager;
 		_logger = logger;
 	}
 
@@ -87,6 +91,15 @@ public class NavigationService : INavigationService
 	{
 		try
 		{
+			if (pageKey == typeof(VideoPlayerViewModel).FullName)
+			{
+				_logger.LogInformation("Routing video navigation to playback presentation. PageKey={PageKey}, ParameterType={ParameterType}",
+					pageKey,
+					parameter?.GetType().FullName ?? "<null>");
+				_playbackPresentationManager.ShowVideo(parameter);
+				return true;
+			}
+
 			_logger.LogInformation("Navigation requested. PageKey={PageKey}, ParameterType={ParameterType}, HasFrame={HasFrame}, CurrentContent={CurrentContent}, ClearNavigation={ClearNavigation}",
 				pageKey,
 				parameter?.GetType().FullName ?? "<null>",

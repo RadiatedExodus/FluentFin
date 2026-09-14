@@ -11,14 +11,27 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <controls:MediaPlayerHost
-        x:Name="MediaPlayerHost"
-        IsSkipButtonVisible="{x:Bind ViewModel.IsSkipButtonVisible, Mode=OneWay}"
-        JellyfinClient="{x:Bind ViewModel.JellyfinClient}"
-        MediaPlayerType="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}"
-        Player="{x:Bind ViewModel.MediaPlayer, Mode=TwoWay}"
-        Playlist="{x:Bind ViewModel.Playlist, Mode=OneWay}"
-        SkipCommand="{x:Bind ViewModel.SkipCommand, Mode=OneWay}"
-        Trickplay="{x:Bind ViewModel.TrickplayViewModel}" />
+    <Grid>
+        <controls:MediaPlayerHost
+            x:Name="MediaPlayerHost"
+            IsSkipButtonVisible="{x:Bind ViewModel.IsSkipButtonVisible, Mode=OneWay}"
+            JellyfinClient="{x:Bind ViewModel.JellyfinClient}"
+            MediaPlayerType="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}"
+            Player="{x:Bind ViewModel.MediaPlayer, Mode=TwoWay}"
+            Playlist="{x:Bind ViewModel.Playlist, Mode=OneWay}"
+            SkipCommand="{x:Bind ViewModel.SkipCommand, Mode=OneWay}"
+            Trickplay="{x:Bind ViewModel.TrickplayViewModel}" />
+
+        <Button
+            Width="48"
+            Height="48"
+            Margin="16"
+            HorizontalAlignment="Left"
+            VerticalAlignment="Top"
+            Click="BackButton_Click"
+            ToolTipService.ToolTip="Back">
+            <SymbolIcon Symbol="Back" />
+        </Button>
+    </Grid>
 
 </Page>

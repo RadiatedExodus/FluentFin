@@ -1,4 +1,4 @@
-﻿using System.Reactive.Linq;
+using System.Reactive.Linq;
 using FluentFin.Contracts.Services;
 using FluentFin.ViewModels;
 using Microsoft.UI.Xaml.Controls;
@@ -38,7 +38,6 @@ public sealed partial class ShellPage : Page
 		KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.Left, VirtualKeyModifiers.Menu));
 		KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.GoBack));
 	}
-
 
 	private static KeyboardAccelerator BuildKeyboardAccelerator(VirtualKey key, VirtualKeyModifiers? modifiers = null)
 	{

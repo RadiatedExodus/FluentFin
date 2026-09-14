@@ -6,7 +6,7 @@ using FluentFin.Core;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.Services;
 using FluentFin.Core.WebSockets;
-using FluentFin.ViewModels;
+using FluentFin.Playback.Presentation;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Hosting;
 using ReactiveUI;
@@ -15,8 +15,8 @@ namespace FluentFin.Services;
 
 public class WebSocketMessageHandler(IObservable<IInboundSocketMessage> webSocketMessages,
 									 IContentDialogService contentDialogService,
-									 INavigationService navigationService,
-									 IJellyfinClient jellyfinClient) : IHostedService
+									 IJellyfinClient jellyfinClient,
+									 IPlaybackPresentationManager playbackPresentationManager) : IHostedService
 {
 	private readonly CompositeDisposable _disposables = [];
 
@@ -34,7 +34,7 @@ public class WebSocketMessageHandler(IObservable<IInboundSocketMessage> webSocke
 												TimeSpan.FromMilliseconds(double.Parse((string)gcm.Data.Arguments.AdditionalData["TimeoutMs"])));
 					 break;
 				 case PlayQueueUpdateMessage { Data.Data.PlayingItemIndex: >= 0 } playMessage:
-					 navigationService.NavigateTo<VideoPlayerViewModel>(playMessage.Data.Data);
+					 playbackPresentationManager.ShowVideo(playMessage.Data.Data);
 					 break;
 				 case GroupJoinedUpdateMessage groupJoined:
 					 contentDialogService.Growl("", $"SyncPlay Enabled", TimeSpan.FromSeconds(5));

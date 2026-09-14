@@ -16,6 +16,7 @@ using FluentFin.Dialogs.Views;
 using FluentFin.Helpers;
 using FluentFin.Plugins.Playback_Reporting;
 using FluentFin.Playback;
+using FluentFin.Playback.Presentation;
 using FluentFin.Services;
 using FluentFin.UI.Core;
 using FluentFin.UI.Core.Contracts.Services;
@@ -115,6 +116,7 @@ public partial class App : Application
 			services.AddSingleton<IBlurHashCache, BlurHashCache>();
 			services.AddSingleton<IPlaybackEngineManager, PlaybackEngineManager>();
 			services.AddSingleton<IHostedPlaybackEngineRegistry>(sp => (PlaybackEngineManager)sp.GetRequiredService<IPlaybackEngineManager>());
+			services.AddSingleton<IPlaybackPresentationManager, PlaybackPresentationManager>();
 			services.AddSingleton<IPlaybackController, VideoPlaybackController>();
 			services.AddSingleton<IPlaybackService, PlaybackService>();
 			services.AddSingleton<Subject<IInboundSocketMessage>>();

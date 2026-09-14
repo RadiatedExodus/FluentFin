@@ -18,7 +18,7 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition />
@@ -27,6 +27,16 @@
         <views:TitleBarControl Grid.Row="0" />
 
         <Frame x:Name="RootFrame" Grid.Row="1" />
+
+        <ContentControl
+            x:Name="PlaybackPresenter"
+            Grid.RowSpan="2"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
+            Canvas.ZIndex="10"
+            Visibility="Collapsed" />
 
     </Grid>
 
