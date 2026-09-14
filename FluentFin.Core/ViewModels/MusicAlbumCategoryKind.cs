@@ -3,10 +3,12 @@ namespace FluentFin.Core.ViewModels;
 public enum MusicAlbumCategoryKind
 {
 	RecentlyAdded,
-	LibraryAlbums
+	LibraryAlbums,
+	ArtistAlbums
 }
 
 public sealed record MusicAlbumCategoryListParameter(
 	string Title,
 	MusicAlbumCategoryKind Kind,
-	Guid? ParentId);
+	Guid? ParentId,
+	Guid? ArtistId = null);

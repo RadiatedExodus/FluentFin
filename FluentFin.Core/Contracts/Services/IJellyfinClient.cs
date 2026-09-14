@@ -50,6 +50,8 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<BaseItemDto?> GetItem(Guid id);
 
+		Task<BaseItemDto?> FindMusicArtistByName(string name, CancellationToken cancellationToken = default);
+
 		IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries(CancellationToken cancellationToken = default);
 
 		IAsyncEnumerable<BaseItemDto> GetUserLibraries();

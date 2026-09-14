@@ -1,4 +1,5 @@
 using FluentFin.Core.Contracts.Services;
+using Jellyfin.Sdk.Generated.Models;
 
 namespace FluentFin.Core.Playback;
 
@@ -17,6 +18,7 @@ public sealed record MusicPlaybackMetadata : PlaybackMetadata
 {
 	public string? Album { get; init; }
 	public IReadOnlyList<string> Artists { get; init; } = [];
+	public IReadOnlyList<NameGuidPair> ArtistItems { get; init; } = [];
 	public int? TrackNumber { get; init; }
 	public int? DiscNumber { get; init; }
 }

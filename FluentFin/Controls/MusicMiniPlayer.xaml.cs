@@ -1,6 +1,9 @@
 using FluentFin.ViewModels;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 
 namespace FluentFin.Controls;
 
@@ -17,6 +20,11 @@ public sealed partial class MusicMiniPlayer : UserControl
 
 	private void Root_Tapped(object sender, TappedRoutedEventArgs e)
 	{
+		if (IsInteractiveSource(e.OriginalSource as DependencyObject))
+		{
+			return;
+		}
+
 		ViewModel.OpenExpandedCommand.Execute(null);
 		e.Handled = true;
 	}
@@ -25,6 +33,21 @@ public sealed partial class MusicMiniPlayer : UserControl
 	{
 		ViewModel.OpenAlbumCommand.Execute(null);
 		e.Handled = true;
+	}
+
+	private static bool IsInteractiveSource(DependencyObject? source)
+	{
+		while (source is not null)
+		{
+			if (source is ButtonBase or Slider or NumberBox)
+			{
+				return true;
+			}
+
+			source = VisualTreeHelper.GetParent(source);
+		}
+
+		return false;
 	}
 
 	private void Interactive_Tapped(object sender, TappedRoutedEventArgs e) => e.Handled = true;

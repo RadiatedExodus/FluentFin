@@ -1,5 +1,4 @@
 using FluentFin.Core.ViewModels;
-using Jellyfin.Sdk.Generated.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -17,11 +16,11 @@ public sealed partial class MusicAlbumPage : Page
 
 	private async void Track_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
 	{
-		if ((sender as FrameworkElement)?.DataContext is not BaseItemDto track)
+		if ((sender as FrameworkElement)?.DataContext is not MusicAlbumTrackViewModel track)
 		{
 			return;
 		}
 
-		await ViewModel.PlayFromTrack(track);
+		await ViewModel.PlayFromTrack(track.Dto);
 	}
 }

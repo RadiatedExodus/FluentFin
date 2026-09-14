@@ -175,6 +175,45 @@ public partial class JellyfinClient
 		}
 	}
 
+	public async Task<BaseItemDto?> FindMusicArtistByName(string name, CancellationToken cancellationToken = default)
+	{
+		if (string.IsNullOrWhiteSpace(name))
+		{
+			return null;
+		}
+
+		try
+		{
+			logger.LogInformation("Jellyfin music artist lookup started. ArtistName={ArtistName}", name);
+			var response = await GetItems(new ItemQuery
+			{
+				Recursive = true,
+				SearchTerm = name,
+				Limit = 10,
+				SortBy = ItemSortBy.SortName,
+				SortOrder = SortOrder.Ascending,
+				IncludeItemTypes = [BaseItemKind.MusicArtist]
+			}, cancellationToken);
+
+			var artist = response?.Items.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))
+				?? response?.Items.FirstOrDefault();
+			logger.LogInformation("Jellyfin music artist lookup completed. ArtistName={ArtistName}, ArtistId={ArtistId}, ResultName={ResultName}",
+				name,
+				artist?.Id,
+				artist?.Name);
+			return artist;
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Jellyfin music artist lookup failed. ArtistName={ArtistName}", name);
+			return null;
+		}
+	}
+
 	public async Task ResetProgress(Guid id)
 	{
 		var dto = await GetItem(id);

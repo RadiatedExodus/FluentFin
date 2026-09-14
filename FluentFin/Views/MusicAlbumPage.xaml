@@ -8,7 +8,9 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:jm="using:Jellyfin.Sdk.Generated.Models"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:FluentFin.Core.ViewModels"
     xmlns:ui="using:CommunityToolkit.WinUI"
+    x:Name="Page"
     Margin="{StaticResource MediumLeftTopRightBottomMargin}"
     mc:Ignorable="d">
 
@@ -49,7 +51,27 @@
                         TextWrapping="Wrap" />
                     <TextBlock
                         Style="{ThemeResource SubtitleTextBlockStyle}"
-                        Text="{x:Bind ViewModel.ArtistsText, Mode=OneWay}" />
+                        Text="{x:Bind ViewModel.ArtistsText, Mode=OneWay}"
+                        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.HasNoArtistLinks), Mode=OneWay}" />
+                    <ItemsRepeater
+                        ItemsSource="{x:Bind ViewModel.ArtistLinks, Mode=OneWay}"
+                        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.HasArtistLinks), Mode=OneWay}">
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MusicArtistLinkViewModel">
+                                <HyperlinkButton
+                                    Margin="0,-4,0,-4"
+                                    Command="{x:Bind OpenCommand, Mode=OneWay}"
+                                    Content="{x:Bind Name, Mode=OneWay}"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                    MinWidth="0"
+                                    Padding="0"
+                                    Style="{StaticResource TextBlockButtonStyle}" />
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Horizontal" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <TextBlock
                             Style="{ThemeResource BodyTextBlockStyle}"
@@ -80,7 +102,7 @@
                     </Grid>
                 </ListView.Header>
                 <ListView.ItemTemplate>
-                    <DataTemplate x:DataType="jm:BaseItemDto">
+                    <DataTemplate x:DataType="vm:MusicAlbumTrackViewModel">
                         <Grid
                             Padding="12,8"
                             ColumnSpacing="12"
@@ -93,21 +115,42 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock
                                 VerticalAlignment="Center"
-                                Text="{x:Bind IndexNumber, Mode=OneWay}" />
+                                Text="{x:Bind Dto.IndexNumber, Mode=OneWay}" />
                             <TextBlock
                                 Grid.Column="1"
                                 VerticalAlignment="Center"
-                                Text="{x:Bind Name, Mode=OneWay}"
+                                Text="{x:Bind Dto.Name, Mode=OneWay}"
                                 TextTrimming="CharacterEllipsis" />
                             <TextBlock
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
-                                Text="{x:Bind c:Converters.JoinStrings(Artists), Mode=OneWay}"
-                                TextTrimming="CharacterEllipsis" />
+                                Text="{x:Bind ArtistsText, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                Visibility="{x:Bind c:Converters.BooleanToVisibility(HasNoArtistLinks), Mode=OneWay}" />
+                            <ItemsRepeater
+                                Grid.Column="2"
+                                ItemsSource="{x:Bind ArtistLinks, Mode=OneWay}"
+                                Visibility="{x:Bind c:Converters.BooleanToVisibility(HasArtistLinks), Mode=OneWay}">
+                                <ItemsRepeater.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MusicArtistLinkViewModel">
+                                        <HyperlinkButton
+                                            Margin="0,-4,0,-4"
+                                            Command="{x:Bind OpenCommand, Mode=OneWay}"
+                                            Content="{x:Bind Name, Mode=OneWay}"
+                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                            MinWidth="0"
+                                            Padding="0"
+                                            Style="{StaticResource TextBlockButtonStyle}" />
+                                    </DataTemplate>
+                                </ItemsRepeater.ItemTemplate>
+                                <ItemsRepeater.Layout>
+                                    <StackLayout Orientation="Horizontal" />
+                                </ItemsRepeater.Layout>
+                            </ItemsRepeater>
                             <TextBlock
                                 Grid.Column="3"
                                 VerticalAlignment="Center"
-                                Text="{x:Bind c:Converters.TicksToTime2(RunTimeTicks), Mode=OneWay}" />
+                                Text="{x:Bind c:Converters.TicksToTime2(Dto.RunTimeTicks), Mode=OneWay}" />
                         </Grid>
                     </DataTemplate>
                 </ListView.ItemTemplate>

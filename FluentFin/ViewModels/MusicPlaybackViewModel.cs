@@ -20,6 +20,7 @@ public partial class MusicPlaybackViewModel : ObservableObject
 	private readonly IPlaybackService _playbackService;
 	private readonly IMusicPlaybackController _musicPlaybackController;
 	private readonly IPlaybackPresentationManager _presentationManager;
+	private readonly IJellyfinClient _jellyfinClient;
 	private readonly INavigationServiceCore _navigationService;
 	private readonly ILogger<MusicPlaybackViewModel> _logger;
 	private readonly DispatcherQueueTimer _positionTimer;
@@ -29,12 +30,14 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		IPlaybackService playbackService,
 		IMusicPlaybackController musicPlaybackController,
 		IPlaybackPresentationManager presentationManager,
+		IJellyfinClient jellyfinClient,
 		INavigationServiceCore navigationService,
 		ILogger<MusicPlaybackViewModel> logger)
 	{
 		_playbackService = playbackService;
 		_musicPlaybackController = musicPlaybackController;
 		_presentationManager = presentationManager;
+		_jellyfinClient = jellyfinClient;
 		_navigationService = navigationService;
 		_logger = logger;
 
@@ -59,6 +62,7 @@ public partial class MusicPlaybackViewModel : ObservableObject
 	}
 
 	public ObservableCollection<MusicQueueItemViewModel> QueueItems { get; } = [];
+	public ObservableCollection<MusicArtistLinkViewModel> ArtistLinks { get; } = [];
 
 	[ObservableProperty]
 	public partial PlaybackItem? CurrentItem { get; set; }
@@ -101,6 +105,8 @@ public partial class MusicPlaybackViewModel : ObservableObject
 	public string ArtistText => CurrentItem?.Metadata is MusicPlaybackMetadata music
 		? string.Join(", ", music.Artists.Where(x => !string.IsNullOrWhiteSpace(x)))
 		: "";
+	public bool HasArtistLinks => ArtistLinks.Count > 0;
+	public bool HasNoArtistLinks => !HasArtistLinks;
 	public string PositionText => FluentFin.Converters.Converters.TimeSpanToString(Position);
 	public string DurationText => Duration > TimeSpan.Zero ? FluentFin.Converters.Converters.TimeSpanToString(Duration) : "--:--";
 	public string PlayPauseGlyph => IsPlaying ? "\uE769" : "\uF5B0";
@@ -223,6 +229,34 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		}
 	}
 
+	public async Task OpenArtist(string name, Guid? artistId)
+	{
+		if (artistId is null)
+		{
+			var artist = await _jellyfinClient.FindMusicArtistByName(name);
+			artistId = artist?.Id;
+		}
+
+		if (artistId is null)
+		{
+			_logger.LogWarning("Music playback artist navigation skipped because artist id could not be resolved. ItemId={ItemId}, ArtistName={ArtistName}",
+				CurrentItem?.JellyfinId,
+				name);
+			return;
+		}
+
+		_logger.LogInformation("Music playback artist navigation requested. ItemId={ItemId}, ArtistId={ArtistId}, ArtistName={ArtistName}",
+			CurrentItem?.JellyfinId,
+			artistId,
+			name);
+		if (_presentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue)
+		{
+			_presentationManager.ShowMusicCompact();
+		}
+
+		_navigationService.NavigateTo<MusicArtistViewModel>(artistId);
+	}
+
 	[RelayCommand]
 	private Task JumpToQueueItem(MusicQueueItemViewModel item) => _musicPlaybackController.JumpToQueueItemAsync(item.Index);
 
@@ -285,6 +319,7 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		OnPropertyChanged(nameof(TrackTitle));
 		OnPropertyChanged(nameof(AlbumTitle));
 		OnPropertyChanged(nameof(ArtistText));
+		RefreshArtistLinks();
 		OnPropertyChanged(nameof(PositionText));
 		OnPropertyChanged(nameof(DurationText));
 		OnPropertyChanged(nameof(PlayPauseGlyph));
@@ -306,6 +341,84 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		}
 
 		OnPropertyChanged(nameof(CurrentQueueIndex));
+	}
+
+	private void RefreshArtistLinks()
+	{
+		ArtistLinks.Clear();
+		foreach (var artist in GetCurrentArtistLinks())
+		{
+			ArtistLinks.Add(new MusicArtistLinkViewModel(artist.Name, artist.Id, OpenArtist));
+		}
+
+		OnPropertyChanged(nameof(HasArtistLinks));
+		OnPropertyChanged(nameof(HasNoArtistLinks));
+	}
+
+	private IEnumerable<(string Name, Guid? Id)> GetCurrentArtistLinks()
+	{
+		if (CurrentItem?.Item is not { } item)
+		{
+			return [];
+		}
+
+		var links = new List<(string Name, Guid? Id)>();
+		AddArtistLinks(links, item.ArtistItems);
+		if (CurrentItem.Metadata is MusicPlaybackMetadata metadata)
+		{
+			AddArtistLinks(links, metadata.ArtistItems);
+		}
+
+		if (links.Count == 0)
+		{
+			AddArtistLinks(links, item.AlbumArtists);
+		}
+
+		if (links.Count == 0)
+		{
+			AddArtistNames(links, item.Artists);
+			if (CurrentItem.Metadata is MusicPlaybackMetadata music)
+			{
+				AddArtistNames(links, music.Artists);
+			}
+		}
+
+		return links
+			.Where(x => !string.IsNullOrWhiteSpace(x.Name))
+			.GroupBy(x => x.Id?.ToString() ?? x.Name, StringComparer.OrdinalIgnoreCase)
+			.Select(x => x.First());
+	}
+
+	private static void AddArtistLinks(List<(string Name, Guid? Id)> links, IReadOnlyList<NameGuidPair>? artists)
+	{
+		if (artists is null)
+		{
+			return;
+		}
+
+		foreach (var artist in artists)
+		{
+			if (!string.IsNullOrWhiteSpace(artist.Name))
+			{
+				links.Add((artist.Name, artist.Id));
+			}
+		}
+	}
+
+	private static void AddArtistNames(List<(string Name, Guid? Id)> links, IReadOnlyList<string>? artists)
+	{
+		if (artists is null)
+		{
+			return;
+		}
+
+		foreach (var artist in artists)
+		{
+			if (!string.IsNullOrWhiteSpace(artist))
+			{
+				links.Add((artist, null));
+			}
+		}
 	}
 
 	private Guid? TryGetAlbumId(BaseItemDto item)

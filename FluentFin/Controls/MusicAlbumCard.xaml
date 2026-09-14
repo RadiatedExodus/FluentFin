@@ -9,6 +9,7 @@
     xmlns:jm="using:Jellyfin.Sdk.Generated.Models"
     xmlns:root="using:FluentFin"
     xmlns:ui="using:CommunityToolkit.WinUI"
+    xmlns:vm="using:FluentFin.Core.ViewModels"
     x:Name="Root">
 
     <UserControl.Resources>
@@ -79,7 +80,28 @@
                 Style="{StaticResource CaptionTextBlockStyle}"
                 Text="{x:Bind Model.Dto, Converter={StaticResource SubtitleConverter}, Mode=OneWay}"
                 TextTrimming="CharacterEllipsis"
-                Visibility="{Binding RelativeSource={RelativeSource Mode=Self}, Path=Text, Converter={StaticResource EmptyStringVisibilityConverter}}" />
+                Visibility="{x:Bind c:Converters.BooleanToVisibility(HasNoArtistLinks), Mode=OneWay}" />
+
+            <ItemsRepeater
+                Grid.Row="1"
+                ItemsSource="{x:Bind ArtistLinks, Mode=OneWay}"
+                Visibility="{x:Bind c:Converters.BooleanToVisibility(HasArtistLinks), Mode=OneWay}">
+                <ItemsRepeater.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MusicArtistLinkViewModel">
+                        <HyperlinkButton
+                            Margin="0,-4,0,-4"
+                            Command="{x:Bind OpenCommand, Mode=OneWay}"
+                            Content="{x:Bind Name, Mode=OneWay}"
+                            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                            MinWidth="0"
+                            Padding="0"
+                            Style="{StaticResource TextBlockButtonStyle}" />
+                    </DataTemplate>
+                </ItemsRepeater.ItemTemplate>
+                <ItemsRepeater.Layout>
+                    <StackLayout Orientation="Horizontal" />
+                </ItemsRepeater.Layout>
+            </ItemsRepeater>
         </Grid>
     </Grid>
 </UserControl>

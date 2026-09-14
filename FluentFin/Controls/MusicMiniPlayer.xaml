@@ -7,6 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:ui="using:CommunityToolkit.WinUI"
+    xmlns:vm="using:FluentFin.Core.ViewModels"
     x:Name="Root"
     MinHeight="96"
     mc:Ignorable="d"
@@ -50,7 +51,27 @@
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="{x:Bind ViewModel.ArtistText, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis" />
+                        TextTrimming="CharacterEllipsis"
+                        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.HasNoArtistLinks), Mode=OneWay}" />
+                    <ItemsRepeater
+                        ItemsSource="{x:Bind ViewModel.ArtistLinks, Mode=OneWay}"
+                        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.HasArtistLinks), Mode=OneWay}">
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MusicArtistLinkViewModel">
+                                <HyperlinkButton
+                                    Margin="0,-8,0,-8"
+                                    Command="{x:Bind OpenCommand, Mode=OneWay}"
+                                    Content="{x:Bind Name}"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                    MinWidth="0"
+                                    Padding="0"
+                                    Style="{StaticResource TextBlockButtonStyle}" />
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                        <ItemsRepeater.Layout>
+                            <StackLayout Orientation="Horizontal" />
+                        </ItemsRepeater.Layout>
+                    </ItemsRepeater>
                 </StackPanel>
             </Grid>
 

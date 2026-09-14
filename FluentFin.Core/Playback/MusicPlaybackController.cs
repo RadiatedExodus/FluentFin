@@ -321,6 +321,7 @@ public sealed class MusicPlaybackController(
 		{
 			Album = item.Album,
 			Artists = item.Artists ?? [],
+			ArtistItems = item.ArtistItems ?? [],
 			TrackNumber = item.IndexNumber,
 			DiscNumber = item.ParentIndexNumber
 		};
