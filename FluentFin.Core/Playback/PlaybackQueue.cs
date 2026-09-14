@@ -4,6 +4,8 @@ public sealed class PlaybackQueue
 {
 	private readonly List<PlaybackItem> _items = [];
 
+	public event EventHandler<PlaybackQueueChangedEventArgs>? Changed;
+
 	public IReadOnlyList<PlaybackItem> Items => _items;
 	public int CurrentIndex { get; private set; } = -1;
 	public PlaybackItem? Current => CurrentIndex >= 0 && CurrentIndex < _items.Count ? _items[CurrentIndex] : null;
@@ -16,6 +18,7 @@ public sealed class PlaybackQueue
 		_items.Clear();
 		_items.AddRange(replacement);
 		CurrentIndex = _items.Count == 0 ? -1 : Math.Clamp(startIndex, 0, _items.Count - 1);
+		OnChanged();
 	}
 
 	public PlaybackItem? Next()
@@ -26,6 +29,7 @@ public sealed class PlaybackQueue
 		}
 
 		CurrentIndex++;
+		OnChanged();
 		return Current;
 	}
 
@@ -37,6 +41,19 @@ public sealed class PlaybackQueue
 		}
 
 		CurrentIndex--;
+		OnChanged();
+		return Current;
+	}
+
+	public PlaybackItem? MoveTo(int index)
+	{
+		if (index < 0 || index >= _items.Count)
+		{
+			return null;
+		}
+
+		CurrentIndex = index;
+		OnChanged();
 		return Current;
 	}
 
@@ -47,6 +64,8 @@ public sealed class PlaybackQueue
 		{
 			CurrentIndex = 0;
 		}
+
+		OnChanged();
 	}
 
 	public void AddRange(IEnumerable<PlaybackItem> items)
@@ -57,6 +76,8 @@ public sealed class PlaybackQueue
 		{
 			CurrentIndex = 0;
 		}
+
+		OnChanged();
 	}
 
 	public void InsertRange(int index, IEnumerable<PlaybackItem> items)
@@ -77,11 +98,43 @@ public sealed class PlaybackQueue
 		{
 			CurrentIndex += inserted.Count;
 		}
+
+		OnChanged();
+	}
+
+	public PlaybackItem? RemoveAt(int index)
+	{
+		if (index < 0 || index >= _items.Count)
+		{
+			return null;
+		}
+
+		var removed = _items[index];
+		_items.RemoveAt(index);
+
+		if (_items.Count == 0)
+		{
+			CurrentIndex = -1;
+		}
+		else if (index < CurrentIndex)
+		{
+			CurrentIndex--;
+		}
+		else if (index == CurrentIndex)
+		{
+			CurrentIndex = Math.Min(index, _items.Count - 1);
+		}
+
+		OnChanged();
+		return removed;
 	}
 
 	public void Clear()
 	{
 		_items.Clear();
 		CurrentIndex = -1;
+		OnChanged();
 	}
+
+	private void OnChanged() => Changed?.Invoke(this, new PlaybackQueueChangedEventArgs(_items.ToList(), CurrentIndex));
 }

@@ -52,6 +52,10 @@ public static class BaseItemDtoConverters
 		{
 			return $"{dto.ProductionYear} - {(string.Equals(dto.Status, "Continuing", StringComparison.OrdinalIgnoreCase) ? "Present" : dto.EndDate?.Year)}";
 		}
+		if (dto.Type == BaseItemDto_Type.MusicAlbum)
+		{
+			return string.Join(", ", new[] { dto.AlbumArtist, dto.ProductionYear?.ToString() }.Where(x => !string.IsNullOrWhiteSpace(x)));
+		}
 
 		return "";
 	}

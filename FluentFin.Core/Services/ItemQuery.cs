@@ -16,4 +16,8 @@ public sealed class ItemQuery
 	public IReadOnlyList<string> Tags { get; init; } = [];
 	public IReadOnlyList<string> OfficialRatings { get; init; } = [];
 	public IReadOnlyList<BaseItemKind> IncludeItemTypes { get; init; } = [];
+	public IReadOnlyList<MediaType> MediaTypes { get; init; } = [];
+	public IReadOnlyList<Guid> ArtistIds { get; init; } = [];
+	public IReadOnlyList<Guid> AlbumArtistIds { get; init; } = [];
+	public Guid? PlaylistId { get; init; }
 }

@@ -29,6 +29,9 @@ public class PageService : IPageService, IPageRegistration
 
 		// Main NavView Pages
 		Configure<HomeViewModel, HomePage>();
+		Configure<MusicLibraryViewModel, MusicLibraryPage>();
+		Configure<MusicAlbumListViewModel, MusicAlbumListPage>();
+		Configure<MusicAlbumViewModel, MusicAlbumPage>();
 		Configure<LibraryViewModel, LibraryPage>();
 		Configure<VideoPlayerViewModel, VideoPlayerPage>();
 		Configure<MovieViewModel, MoviePage>();
@@ -61,6 +64,9 @@ public class PageService : IPageService, IPageRegistration
 
 		// Setup Parent/Child Relationships
 		ConfigureParent<LibraryViewModel, LibrariesLandingPageViewModel>();
+		ConfigureParent<MusicLibraryViewModel, LibrariesLandingPageViewModel>();
+		ConfigureParent<MusicAlbumListViewModel, MusicLibraryViewModel>();
+		ConfigureParent<MusicAlbumViewModel, MusicLibraryViewModel>();
 
 		pluginManager.ConfigurePages(this);
 	}

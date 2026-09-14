@@ -25,6 +25,8 @@ public sealed class MusicPlaybackController(
 	private IPlaybackService PlaybackService => (IPlaybackService)(serviceProvider.GetService(typeof(IPlaybackService))
 		?? throw new InvalidOperationException("IPlaybackService is not registered."));
 
+	public event EventHandler? MusicOptionsChanged;
+
 	public PlaybackKind Kind => PlaybackKind.Music;
 	public PlaybackState State => _engine?.State ?? PlaybackState.Stopped;
 	public TimeSpan Position => _engine?.Position ?? TimeSpan.Zero;
@@ -85,6 +87,7 @@ public sealed class MusicPlaybackController(
 	{
 		EnsureQueuePolicy().SetShuffle(enabled);
 		logger.LogInformation("Music shuffle changed. Enabled={Enabled}, CurrentItemId={CurrentItemId}", enabled, _queuePolicy?.Current?.JellyfinId);
+		MusicOptionsChanged?.Invoke(this, EventArgs.Empty);
 		await RefreshNativeQueue(cancellationToken);
 	}
 
@@ -92,6 +95,7 @@ public sealed class MusicPlaybackController(
 	{
 		EnsureQueuePolicy().SetRepeatMode(repeatMode);
 		logger.LogInformation("Music repeat mode changed. RepeatMode={RepeatMode}, CurrentItemId={CurrentItemId}", repeatMode, _queuePolicy?.Current?.JellyfinId);
+		MusicOptionsChanged?.Invoke(this, EventArgs.Empty);
 		await RefreshNativeQueue(cancellationToken);
 	}
 
@@ -109,6 +113,69 @@ public sealed class MusicPlaybackController(
 		EnsureQueuePolicy().PlayNext(items);
 		logger.LogInformation("Music items inserted to play next. AddedCount={AddedCount}, QueueCount={QueueCount}", items.Count, PlaybackService.Queue.Items.Count);
 		await RefreshNativeQueue(cancellationToken);
+	}
+
+	public async Task JumpToQueueItemAsync(int index, CancellationToken cancellationToken = default)
+	{
+		await _transitionLock.WaitAsync(cancellationToken);
+		try
+		{
+			var item = EnsureQueuePolicy().JumpTo(index);
+			logger.LogInformation("Music queue jump requested. Index={Index}, ItemId={ItemId}", index, item?.JellyfinId);
+			await MoveToCurrentQueueItem(item, restartEngine: true, cancellationToken);
+		}
+		finally
+		{
+			_transitionLock.Release();
+		}
+	}
+
+	public async Task RemoveQueueItemAsync(int index, CancellationToken cancellationToken = default)
+	{
+		await _transitionLock.WaitAsync(cancellationToken);
+		try
+		{
+			var queue = PlaybackService.Queue;
+			var removedCurrent = index == queue.CurrentIndex;
+			var removed = EnsureQueuePolicy().RemoveAt(index);
+			logger.LogInformation("Music queue remove requested. Index={Index}, RemovedItemId={RemovedItemId}, RemovedCurrent={RemovedCurrent}, QueueCount={QueueCount}",
+				index,
+				removed?.JellyfinId,
+				removedCurrent,
+				queue.Items.Count);
+
+			if (removed is null)
+			{
+				return;
+			}
+
+			if (removedCurrent)
+			{
+				await ReportStopped(cancellationToken);
+				if (queue.Current is null)
+				{
+					await PlaybackService.StopAsync(cancellationToken);
+					return;
+				}
+
+				_currentItem = queue.Current;
+				await OpenCurrentQueueWindow(cancellationToken);
+				if (_engine is not null)
+				{
+					await _engine.PlayAsync(cancellationToken);
+				}
+
+				await ReportStarted(cancellationToken);
+			}
+			else
+			{
+				await RefreshNativeQueue(cancellationToken);
+			}
+		}
+		finally
+		{
+			_transitionLock.Release();
+		}
 	}
 
 	public async Task PrepareAsync(PlaybackRequest request, IMediaPlaybackEngine engine, CancellationToken cancellationToken = default)
@@ -268,7 +335,7 @@ public sealed class MusicPlaybackController(
 	{
 		if (item is null)
 		{
-			await StopAsync(cancellationToken);
+			await PlaybackService.StopAsync(cancellationToken);
 			return;
 		}
 

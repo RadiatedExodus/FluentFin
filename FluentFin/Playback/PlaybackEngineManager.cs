@@ -2,13 +2,14 @@ using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.Playback;
 using FluentFin.Core.Settings;
 using FluentFin.MediaPlayers;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FluentFin.Playback;
 
 public sealed class PlaybackEngineManager(
 	ISettings settings,
-	WindowsMusicPlaybackEngine musicEngine,
+	IServiceProvider serviceProvider,
 	ILogger<PlaybackEngineManager> logger) : IPlaybackEngineManager
 	, IHostedPlaybackEngineRegistry
 {
@@ -30,6 +31,7 @@ public sealed class PlaybackEngineManager(
 
 		if (kind is PlaybackKind.Music)
 		{
+			var musicEngine = serviceProvider.GetRequiredService<WindowsMusicPlaybackEngine>();
 			logger.LogInformation("Activating Windows music playback engine. EngineId={EngineId}", musicEngine.Id);
 			ActiveEngine = musicEngine;
 			return Task.FromResult<IMediaPlaybackEngine>(musicEngine);

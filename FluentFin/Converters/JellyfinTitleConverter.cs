@@ -46,6 +46,10 @@ public partial class JellyfinSubtitleConverter : IValueConverter
 		{
 			return $"{bid.ProductionYear} - {(string.Equals(bid.Status, "Continuing", StringComparison.OrdinalIgnoreCase) ? "Present" : bid.EndDate?.Year)}";
 		}
+		if (bid.Type == BaseItemDto_Type.MusicAlbum)
+		{
+			return string.Join(", ", new[] { bid.AlbumArtist, bid.ProductionYear?.ToString() }.Where(x => !string.IsNullOrWhiteSpace(x)));
+		}
 
 		return "";
 	}

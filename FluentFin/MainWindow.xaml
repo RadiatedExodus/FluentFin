@@ -38,6 +38,26 @@
             Canvas.ZIndex="10"
             Visibility="Collapsed" />
 
+        <ContentControl
+            x:Name="MusicOverlayPresenter"
+            Grid.Row="1"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            VerticalContentAlignment="Stretch"
+            Canvas.ZIndex="8"
+            Visibility="Collapsed" />
+
+        <ContentControl
+            x:Name="MusicMiniPlayerPresenter"
+            Grid.Row="1"
+            HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            VerticalContentAlignment="Stretch"
+            Canvas.ZIndex="9"
+            Visibility="Collapsed" />
+
     </Grid>
 
 </windowex:WindowEx>

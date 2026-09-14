@@ -4,6 +4,8 @@ namespace FluentFin.Core.Playback;
 
 public interface IMusicPlaybackController
 {
+	event EventHandler? MusicOptionsChanged;
+
 	bool ShuffleEnabled { get; }
 	PlaybackRepeatMode RepeatMode { get; }
 
@@ -16,4 +18,6 @@ public interface IMusicPlaybackController
 	Task SetRepeatModeAsync(PlaybackRepeatMode repeatMode, CancellationToken cancellationToken = default);
 	Task AddToQueueAsync(BaseItemDto item, CancellationToken cancellationToken = default);
 	Task PlayNextAsync(BaseItemDto item, CancellationToken cancellationToken = default);
+	Task JumpToQueueItemAsync(int index, CancellationToken cancellationToken = default);
+	Task RemoveQueueItemAsync(int index, CancellationToken cancellationToken = default);
 }

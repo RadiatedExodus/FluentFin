@@ -17,6 +17,7 @@ public sealed class WindowsMusicPlaybackEngine : IQueuedPlaybackEngine, IPlaybac
 	{
 		_logger = logger;
 		_player = new MediaPlayer { AutoPlay = false };
+		_player.CommandManager.IsEnabled = false;
 		_player.MediaOpened += OnMediaOpened;
 		_player.MediaEnded += OnMediaEnded;
 		_player.MediaFailed += OnMediaFailed;

@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 using FluentFin.Core.Services;
 using FluentFin.Core.Settings;
 using FluentFin.Core.ViewModels;
@@ -10,11 +11,18 @@ namespace FluentFin.Core;
 
 public partial class GlobalCommands(INavigationServiceCore navigationService,
 									IJellyfinClient jellyfinClient,
+									IMusicPlaybackController musicPlaybackController,
 									INavigationViewServiceCore navigationViewService)
 {
 	[RelayCommand]
 	public async Task PlayDto(BaseItemDto dto)
 	{
+		if (IsMusicItem(dto))
+		{
+			await PlayMusicDto(dto);
+			return;
+		}
+
 		if (SessionInfo.GroupId is not null)
 		{
 			var ids = await GetItemIds(dto);
@@ -57,6 +65,24 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 	}
 
 	[RelayCommand]
+	public async Task PlayNextDto(BaseItemDto dto)
+	{
+		if (IsMusicItem(dto))
+		{
+			await musicPlaybackController.PlayNextAsync(dto);
+		}
+	}
+
+	[RelayCommand]
+	public async Task AddToQueueDto(BaseItemDto dto)
+	{
+		if (IsMusicItem(dto))
+		{
+			await musicPlaybackController.AddToQueueAsync(dto);
+		}
+	}
+
+	[RelayCommand]
 	public void DisplayDto(BaseItemDto dto)
 	{
 		switch (dto.Type)
@@ -72,6 +98,12 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 				break;
 			case BaseItemDto_Type.Episode:
 				navigationService.NavigateTo<EpisodeViewModel>(dto);
+				break;
+			case BaseItemDto_Type.MusicAlbum:
+				navigationService.NavigateTo<MusicAlbumViewModel>(dto);
+				break;
+			case BaseItemDto_Type.CollectionFolder when dto.CollectionType is BaseItemDto_CollectionType.Music:
+				navigationService.NavigateTo<MusicLibraryViewModel>(dto);
 				break;
 			default:
 				break;
@@ -107,6 +139,7 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 			{
 				BaseItemDto_CollectionType.Tvshows => "\uE7F4",
 				BaseItemDto_CollectionType.Movies => "\uE8B2",
+				BaseItemDto_CollectionType.Music => "\uE189",
 				_ => null
 			},
 			Commands = [new CommandModel() { Name = "Unpin", DisplayName = "Unpin", Glyph = "\uE77A" }],
@@ -144,5 +177,30 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 		var index = playlist.Items.IndexOf(playlist.SelectedItem);
 		return [.. playlist.Items.Skip(index).Select(x => x.Dto.Id)];
 	}
+
+	private async Task PlayMusicDto(BaseItemDto dto)
+	{
+		switch (dto.Type)
+		{
+			case BaseItemDto_Type.Audio:
+				await musicPlaybackController.PlaySongAsync(dto);
+				break;
+			case BaseItemDto_Type.MusicAlbum:
+				if ((await jellyfinClient.GetPlayableAudioItems(dto)).FirstOrDefault() is { } firstTrack)
+				{
+					await musicPlaybackController.PlayAlbumFromTrackAsync(dto, firstTrack);
+				}
+				break;
+			case BaseItemDto_Type.Playlist:
+				if ((await jellyfinClient.GetPlayableAudioItems(dto)).FirstOrDefault() is { } firstPlaylistTrack)
+				{
+					await musicPlaybackController.PlayPlaylistFromTrackAsync(dto, firstPlaylistTrack);
+				}
+				break;
+		}
+	}
+
+	private static bool IsMusicItem(BaseItemDto dto) =>
+		dto.Type is BaseItemDto_Type.Audio or BaseItemDto_Type.MusicAlbum or BaseItemDto_Type.Playlist;
 
 }

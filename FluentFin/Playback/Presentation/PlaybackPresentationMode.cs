@@ -6,3 +6,11 @@ public enum PlaybackPresentationMode
 	VideoOverlay,
 	MusicPlaceholder
 }
+
+public enum MusicPresentationMode
+{
+	Hidden,
+	Compact,
+	Expanded,
+	Queue
+}

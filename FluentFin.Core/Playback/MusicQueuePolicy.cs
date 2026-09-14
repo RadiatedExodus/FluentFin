@@ -63,6 +63,8 @@ public sealed class MusicQueuePolicy(PlaybackQueue queue)
 		return null;
 	}
 
+	public PlaybackItem? JumpTo(int index) => queue.MoveTo(index);
+
 	public void AddToQueue(IEnumerable<PlaybackItem> items)
 	{
 		queue.AddRange(items);
@@ -72,6 +74,8 @@ public sealed class MusicQueuePolicy(PlaybackQueue queue)
 	{
 		queue.InsertRange(queue.CurrentIndex + 1, items);
 	}
+
+	public PlaybackItem? RemoveAt(int index) => queue.RemoveAt(index);
 
 	private void ShuffleUpcoming()
 	{

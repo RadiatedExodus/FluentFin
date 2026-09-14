@@ -118,6 +118,36 @@ public partial class JellyfinFlyoutConverter : IValueConverter
 
 	private static IEnumerable<MenuFlyoutItemBase> GetPlayItems(BaseItemDto dto, BaseItemDto_Type type)
 	{
+		if (type is BaseItemDto_Type.Audio or BaseItemDto_Type.MusicAlbum or BaseItemDto_Type.Playlist)
+		{
+			yield return new MenuFlyoutItem
+			{
+				Text = "Play",
+				Icon = new SymbolIcon { Symbol = Symbol.Play },
+				Command = App.Commands.PlayDtoCommand,
+				CommandParameter = dto
+			};
+
+			yield return new MenuFlyoutItem
+			{
+				Text = "Play next",
+				Icon = new FontIcon { Glyph = "\uE893" },
+				Command = App.Commands.PlayNextDtoCommand,
+				CommandParameter = dto
+			};
+
+			yield return new MenuFlyoutItem
+			{
+				Text = "Add to queue",
+				Icon = new FontIcon { Glyph = "\uE8FD" },
+				Command = App.Commands.AddToQueueDtoCommand,
+				CommandParameter = dto
+			};
+
+			yield return new MenuFlyoutSeparator();
+			yield break;
+		}
+
 		if (type is BaseItemDto_Type.Movie or BaseItemDto_Type.Season or BaseItemDto_Type.Series or BaseItemDto_Type.Episode)
 		{
 			yield return new MenuFlyoutItem

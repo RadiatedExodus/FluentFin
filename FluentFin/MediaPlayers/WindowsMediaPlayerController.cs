@@ -33,6 +33,7 @@ namespace FluentFin.MediaPlayers
 		{
 			_audioTracksButton = audioTracksButton;
 			element.AreTransportControlsEnabled = false;
+			_mp.CommandManager.IsEnabled = false;
 			element.SetMediaPlayer(_mp);
 		}
 

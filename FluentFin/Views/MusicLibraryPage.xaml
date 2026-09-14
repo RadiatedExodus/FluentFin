@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="FluentFin.Views.MusicLibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:FluentFin.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Margin="{StaticResource MediumLeftTopRightBottomMargin}"
+    mc:Ignorable="d">
+
+    <ScrollViewer>
+        <StackPanel Spacing="24">
+            <TextBlock
+                Style="{ThemeResource TitleTextBlockStyle}"
+                Text="{x:Bind ViewModel.Title, Mode=OneWay}" />
+
+            <controls:MusicAlbumCategoryRail
+                Albums="{x:Bind ViewModel.RecentlyAddedAlbums, Mode=OneWay}"
+                HeaderCommand="{x:Bind ViewModel.ShowRecentlyAddedAlbumsCommand, Mode=OneWay}"
+                JellyfinClient="{x:Bind ViewModel.JellyfinClient, Mode=OneWay}"
+                Title="Recently added" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

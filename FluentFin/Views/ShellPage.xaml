@@ -26,8 +26,12 @@
         <NavigationView.MenuItems>
             <NavigationViewItem
                 helpers:NavigationHelper.NavigateTo="FluentFin.Core.ViewModels.HomeViewModel"
-                Content="Home"
-                Icon="{ui:SymbolIcon Symbol=Home}" />
+                Content="Video"
+                Icon="{ui:FontIcon Glyph=&#xE8B2;}" />
+            <NavigationViewItem
+                helpers:NavigationHelper.NavigateTo="FluentFin.Core.ViewModels.MusicLibraryViewModel"
+                Content="Audio"
+                Icon="{ui:FontIcon Glyph=&#xE189;}" />
             <NavigationViewItem
                 helpers:NavigationHelper.NavigateTo="FluentFin.Core.ViewModels.LibrariesLandingPageViewModel"
                 Content="Libraries"

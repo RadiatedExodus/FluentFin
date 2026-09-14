@@ -6,12 +6,25 @@ using Microsoft.Extensions.Logging;
 
 namespace FluentFin.Playback.Presentation;
 
-public partial class PlaybackPresentationManager(ILogger<PlaybackPresentationManager> logger) : ObservableObject, IPlaybackPresentationManager
+public partial class PlaybackPresentationManager : ObservableObject, IPlaybackPresentationManager
 {
+	private readonly IPlaybackService _playbackService;
+	private readonly ILogger<PlaybackPresentationManager> _logger;
 	private int _requestId;
+
+	public PlaybackPresentationManager(IPlaybackService playbackService, ILogger<PlaybackPresentationManager> logger)
+	{
+		_playbackService = playbackService;
+		_logger = logger;
+		_playbackService.PlaybackChanged += (_, _) => SyncMusicPresentationFromPlayback();
+		_playbackService.QueueChanged += (_, _) => SyncMusicPresentationFromPlayback();
+	}
 
 	[ObservableProperty]
 	public partial PlaybackPresentationMode Mode { get; private set; } = PlaybackPresentationMode.None;
+
+	[ObservableProperty]
+	public partial MusicPresentationMode MusicMode { get; private set; } = MusicPresentationMode.Hidden;
 
 	[ObservableProperty]
 	public partial VideoOverlayPresentationState? VideoOverlay { get; private set; }
@@ -19,12 +32,12 @@ public partial class PlaybackPresentationManager(ILogger<PlaybackPresentationMan
 	[ObservableProperty]
 	public partial MusicPresentationState? Music { get; private set; }
 
-	public bool HasActivePresentation => Mode is not PlaybackPresentationMode.None;
+	public bool HasActivePresentation => Mode is not PlaybackPresentationMode.None || MusicMode is not MusicPresentationMode.Hidden;
 
 	public void ShowVideo(object? parameter)
 	{
 		var requestId = Interlocked.Increment(ref _requestId);
-		logger.LogInformation("Showing video playback presentation. RequestId={RequestId}, ParameterType={ParameterType}, ItemId={ItemId}",
+		_logger.LogInformation("Showing video playback presentation. RequestId={RequestId}, ParameterType={ParameterType}, ItemId={ItemId}",
 			requestId,
 			parameter?.GetType().FullName ?? "<null>",
 			GetItemId(parameter));
@@ -39,14 +52,69 @@ public partial class PlaybackPresentationManager(ILogger<PlaybackPresentationMan
 	public void ShowMusicPlaceholder(PlaybackItem? currentItem, IReadOnlyList<PlaybackItem>? queueItems = null, string? title = null, PlaybackState state = PlaybackState.Stopped)
 	{
 		var items = queueItems ?? [];
-		logger.LogInformation("Showing placeholder music playback presentation. ItemId={ItemId}, QueueCount={QueueCount}, State={State}",
+		_logger.LogInformation("Showing placeholder music playback presentation. ItemId={ItemId}, QueueCount={QueueCount}, State={State}",
 			currentItem?.JellyfinId,
 			items.Count,
 			state);
 
 		Music = new MusicPresentationState(currentItem, items, title ?? currentItem?.Title, state);
-		Mode = PlaybackPresentationMode.MusicPlaceholder;
+		MusicMode = MusicPresentationMode.Compact;
+		Mode = PlaybackPresentationMode.None;
 		VideoOverlay = null;
+		OnPropertyChanged(nameof(HasActivePresentation));
+	}
+
+	public void ShowMusicCompact()
+	{
+		if (!IsMusicActive())
+		{
+			return;
+		}
+
+		_logger.LogInformation("Showing compact music presentation. ItemId={ItemId}", _playbackService.CurrentItem?.JellyfinId);
+		UpdateMusicState();
+		MusicMode = MusicPresentationMode.Compact;
+		OnPropertyChanged(nameof(HasActivePresentation));
+	}
+
+	public void ShowMusicExpanded()
+	{
+		if (!IsMusicActive())
+		{
+			return;
+		}
+
+		_logger.LogInformation("Showing expanded music presentation. ItemId={ItemId}", _playbackService.CurrentItem?.JellyfinId);
+		UpdateMusicState();
+		MusicMode = MusicPresentationMode.Expanded;
+		OnPropertyChanged(nameof(HasActivePresentation));
+	}
+
+	public void ShowMusicQueue()
+	{
+		if (!IsMusicActive())
+		{
+			return;
+		}
+
+		_logger.LogInformation("Showing music queue presentation. ItemId={ItemId}, QueueCount={QueueCount}",
+			_playbackService.CurrentItem?.JellyfinId,
+			_playbackService.Queue.Items.Count);
+		UpdateMusicState();
+		MusicMode = MusicPresentationMode.Queue;
+		OnPropertyChanged(nameof(HasActivePresentation));
+	}
+
+	public void HideMusic()
+	{
+		if (MusicMode is MusicPresentationMode.Hidden)
+		{
+			return;
+		}
+
+		_logger.LogInformation("Hiding music presentation. Mode={MusicMode}, ItemId={ItemId}", MusicMode, Music?.CurrentItem?.JellyfinId);
+		Music = null;
+		MusicMode = MusicPresentationMode.Hidden;
 		OnPropertyChanged(nameof(HasActivePresentation));
 	}
 
@@ -54,22 +122,77 @@ public partial class PlaybackPresentationManager(ILogger<PlaybackPresentationMan
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 
-		if (Mode is PlaybackPresentationMode.None)
+		if (Mode is PlaybackPresentationMode.None && MusicMode is MusicPresentationMode.Hidden)
 		{
 			return Task.CompletedTask;
 		}
 
-		logger.LogInformation("Hiding playback presentation. Mode={Mode}, VideoRequestId={VideoRequestId}, MusicItemId={MusicItemId}",
+		_logger.LogInformation("Hiding playback presentation. Mode={Mode}, MusicMode={MusicMode}, VideoRequestId={VideoRequestId}, MusicItemId={MusicItemId}",
 			Mode,
+			MusicMode,
 			VideoOverlay?.RequestId,
 			Music?.CurrentItem?.JellyfinId);
 
-		VideoOverlay = null;
-		Music = null;
-		Mode = PlaybackPresentationMode.None;
+		if (Mode is PlaybackPresentationMode.VideoOverlay)
+		{
+			VideoOverlay = null;
+			Mode = PlaybackPresentationMode.None;
+		}
+		else if (MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue)
+		{
+			MusicMode = IsMusicActive() ? MusicPresentationMode.Compact : MusicPresentationMode.Hidden;
+			if (MusicMode is MusicPresentationMode.Hidden)
+			{
+				Music = null;
+			}
+		}
+		else
+		{
+			HideMusic();
+		}
+
 		OnPropertyChanged(nameof(HasActivePresentation));
 
 		return Task.CompletedTask;
+	}
+
+	private void SyncMusicPresentationFromPlayback()
+	{
+		if (IsMusicActive())
+		{
+			UpdateMusicState();
+			if (MusicMode is MusicPresentationMode.Hidden)
+			{
+				MusicMode = MusicPresentationMode.Compact;
+				OnPropertyChanged(nameof(HasActivePresentation));
+			}
+
+			return;
+		}
+
+		if (MusicMode is not MusicPresentationMode.Hidden)
+		{
+			HideMusic();
+		}
+	}
+
+	private bool IsMusicActive() =>
+		_playbackService.CurrentKind is PlaybackKind.Music &&
+		_playbackService.CurrentItem is not null &&
+		_playbackService.State is not PlaybackState.Stopped and not PlaybackState.Ended;
+
+	private void UpdateMusicState()
+	{
+		if (_playbackService.CurrentKind is not PlaybackKind.Music)
+		{
+			return;
+		}
+
+		Music = new MusicPresentationState(
+			_playbackService.CurrentItem,
+			_playbackService.Queue.Items.ToList(),
+			_playbackService.CurrentItem?.Title,
+			_playbackService.State);
 	}
 
 	private static Guid? GetItemId(object? parameter)

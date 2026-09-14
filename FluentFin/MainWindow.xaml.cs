@@ -1,4 +1,5 @@
 using FluentFin.Contracts.Services;
+using FluentFin.Controls;
 using FluentFin.Core;
 using FluentFin.Core.ViewModels;
 using FluentFin.Playback.Presentation;
@@ -16,7 +17,11 @@ public sealed partial class MainWindow : WindowEx
 	private readonly IPlaybackPresentationManager _playbackPresentationManager;
 	private readonly ILogger<MainWindow> _logger;
 	private VideoPlayerPage? _videoPlayerPage;
+	private MusicMiniPlayer? _musicMiniPlayer;
+	private MusicExpandedPlayer? _musicExpandedPlayer;
+	private MusicQueuePanel? _musicQueuePanel;
 	private int _activeVideoRequestId;
+	private int _playbackPresentationUpdateQueued;
 
 	public IMainWindowViewModel ViewModel { get; } = App.GetService<IMainWindowViewModel>();
 
@@ -29,11 +34,11 @@ public sealed partial class MainWindow : WindowEx
 		AppWindow.SetIcon("Assets/jellyfin.ico");
 
 		App.GetKeyedService<INavigationService>(NavigationRegions.InitialSetup).Frame = RootFrame;
-		_playbackPresentationManager.PropertyChanged += async (_, e) =>
+		_playbackPresentationManager.PropertyChanged += (_, e) =>
 		{
-			if (e.PropertyName is nameof(IPlaybackPresentationManager.Mode))
+			if (e.PropertyName is nameof(IPlaybackPresentationManager.Mode) or nameof(IPlaybackPresentationManager.MusicMode))
 			{
-				await UpdatePlaybackPresentationAsync();
+				QueuePlaybackPresentationUpdate();
 			}
 		};
 
@@ -55,10 +60,30 @@ public sealed partial class MainWindow : WindowEx
 		return keyboardAccelerator;
 	}
 
+	private void QueuePlaybackPresentationUpdate()
+	{
+		if (Interlocked.Exchange(ref _playbackPresentationUpdateQueued, 1) == 1)
+		{
+			return;
+		}
+
+		if (DispatcherQueue.HasThreadAccess)
+		{
+			_ = UpdatePlaybackPresentationAsync();
+			return;
+		}
+
+		if (!DispatcherQueue.TryEnqueue(() => _ = UpdatePlaybackPresentationAsync()))
+		{
+			Interlocked.Exchange(ref _playbackPresentationUpdateQueued, 0);
+		}
+	}
+
 	private static void OnKeyboardAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
 	{
 		var playbackPresentationManager = App.GetService<IPlaybackPresentationManager>();
-		if (playbackPresentationManager.HasActivePresentation)
+		if (playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
+			playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue)
 		{
 			_ = playbackPresentationManager.HideAsync();
 			args.Handled = true;
@@ -69,6 +94,8 @@ public sealed partial class MainWindow : WindowEx
 	{
 		try
 		{
+			Interlocked.Exchange(ref _playbackPresentationUpdateQueued, 0);
+
 			if (_playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay &&
 				_playbackPresentationManager.VideoOverlay is { } state)
 			{
@@ -76,6 +103,9 @@ public sealed partial class MainWindow : WindowEx
 					state.RequestId,
 					state.Parameter?.GetType().FullName ?? "<null>");
 				PlaybackPresenter.Visibility = Visibility.Visible;
+				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
+				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
+				RootFrame.Margin = new Thickness(0);
 
 				if (_activeVideoRequestId != state.RequestId)
 				{
@@ -102,10 +132,49 @@ public sealed partial class MainWindow : WindowEx
 
 			PlaybackPresenter.Content = null;
 			PlaybackPresenter.Visibility = Visibility.Collapsed;
+			UpdateMusicPresentation();
 		}
 		catch (Exception ex)
 		{
 			_logger.LogError(ex, "Failed to update playback presentation. Mode={Mode}", _playbackPresentationManager.Mode);
+		}
+	}
+
+	private void UpdateMusicPresentation()
+	{
+		switch (_playbackPresentationManager.MusicMode)
+		{
+			case MusicPresentationMode.Expanded:
+				_musicExpandedPlayer ??= new MusicExpandedPlayer();
+				MusicOverlayPresenter.Content = _musicExpandedPlayer;
+				MusicOverlayPresenter.Visibility = Visibility.Visible;
+				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
+				RootFrame.Margin = new Thickness(0);
+				break;
+			case MusicPresentationMode.Queue:
+				_musicQueuePanel ??= new MusicQueuePanel();
+				_musicMiniPlayer ??= new MusicMiniPlayer();
+				MusicOverlayPresenter.Content = _musicQueuePanel;
+				MusicMiniPlayerPresenter.Content = _musicMiniPlayer;
+				MusicOverlayPresenter.Visibility = Visibility.Visible;
+				MusicMiniPlayerPresenter.Visibility = Visibility.Visible;
+				RootFrame.Margin = new Thickness(0, 0, 0, 96);
+				break;
+			case MusicPresentationMode.Compact:
+				_musicMiniPlayer ??= new MusicMiniPlayer();
+				MusicOverlayPresenter.Content = null;
+				MusicMiniPlayerPresenter.Content = _musicMiniPlayer;
+				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
+				MusicMiniPlayerPresenter.Visibility = Visibility.Visible;
+				RootFrame.Margin = new Thickness(0, 0, 0, 96);
+				break;
+			default:
+				MusicOverlayPresenter.Content = null;
+				MusicMiniPlayerPresenter.Content = null;
+				MusicOverlayPresenter.Visibility = Visibility.Collapsed;
+				MusicMiniPlayerPresenter.Visibility = Visibility.Collapsed;
+				RootFrame.Margin = new Thickness(0);
+				break;
 		}
 	}
 }

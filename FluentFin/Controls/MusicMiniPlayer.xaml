@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="FluentFin.Controls.MusicMiniPlayer"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:FluentFin.Converters"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="using:CommunityToolkit.WinUI"
+    x:Name="Root"
+    MinHeight="96"
+    mc:Ignorable="d"
+    Tapped="Root_Tapped">
+
+    <Border
+        Padding="16,10"
+        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="0,1,0,0">
+        <Grid ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="360" />
+            </Grid.ColumnDefinitions>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="64" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button
+                    Width="64"
+                    Height="64"
+                    Padding="0"
+                    Command="{x:Bind ViewModel.OpenAlbumCommand, Mode=OneWay}"
+                    Style="{ThemeResource BareButtonStyle}"
+                    Tapped="Interactive_Tapped">
+                    <Image Source="{x:Bind ViewModel.Artwork, Mode=OneWay}" Stretch="UniformToFill" />
+                </Button>
+                <StackPanel
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Spacing="2">
+                    <TextBlock
+                        Style="{ThemeResource BodyStrongTextBlockStyle}"
+                        Text="{x:Bind ViewModel.TrackTitle, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        Tapped="AlbumLink_Tapped" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.ArtistText, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Column="1" RowSpacing="6">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="48" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="48" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.PositionText, Mode=OneWay}" />
+                    <Slider
+                        x:Name="ProgressSlider"
+                        Grid.Column="1"
+                        Maximum="{x:Bind ViewModel.DurationSeconds, Mode=OneWay}"
+                        PointerPressed="Interactive_PointerPressed"
+                        Value="{x:Bind ViewModel.PositionSeconds, Mode=OneWay}" />
+                    <TextBlock
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind ViewModel.DurationText, Mode=OneWay}" />
+                </Grid>
+                <StackPanel
+                    Grid.Row="1"
+                    HorizontalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Button Command="{x:Bind ViewModel.ToggleShuffleCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8B1;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Shuffle" />
+                    <Button Command="{x:Bind ViewModel.PreviousCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE892;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Previous" />
+                    <Button Command="{x:Bind ViewModel.TogglePlayPauseCommand, Mode=OneWay}" Style="{ThemeResource AccentButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Play/Pause">
+                        <Grid Width="20" Height="20">
+                            <ProgressRing
+                                Width="18"
+                                Height="18"
+                                Foreground="Black"
+                                IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+                            <FontIcon
+                                Glyph="{x:Bind ViewModel.PlayPauseGlyph, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.PlayPauseIconVisibility, Mode=OneWay}" />
+                        </Grid>
+                    </Button>
+                    <Button Command="{x:Bind ViewModel.StopCommand, Mode=OneWay}" Content="{ui:SymbolIcon Symbol=Stop}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Stop" />
+                    <Button Command="{x:Bind ViewModel.NextCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE893;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Next" />
+                    <Button Command="{x:Bind ViewModel.CycleRepeatModeCommand, Mode=OneWay}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="{x:Bind ViewModel.RepeatToolTip, Mode=OneWay}">
+                        <FontIcon Glyph="{x:Bind ViewModel.RepeatGlyph, Mode=OneWay}" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel
+                Grid.Column="2"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                PointerPressed="Interactive_PointerPressed"
+                Spacing="10"
+                Tapped="Interactive_Tapped">
+                <Button Command="{x:Bind ViewModel.OpenQueueCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8FD;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Queue" />
+                <FontIcon
+                    VerticalAlignment="Center"
+                    FontSize="16"
+                    Glyph="&#xE767;" />
+                <Slider
+                    x:Name="VolumeSlider"
+                    Width="120"
+                    Maximum="100"
+                    PointerPressed="Interactive_PointerPressed"
+                    Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}" />
+                <NumberBox
+                    x:Name="VolumeNumberBox"
+                    Width="72"
+                    Maximum="100"
+                    Minimum="0"
+                    SmallChange="1"
+                    SpinButtonPlacementMode="Compact"
+                    PointerPressed="Interactive_PointerPressed"
+                    Tapped="Interactive_Tapped"
+                    Value="{x:Bind ViewModel.VolumePercentValue, Mode=OneWay}"
+                    ValueChanged="VolumeNumberBox_ValueChanged" />
+                <TextBlock VerticalAlignment="Center" Text="%" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

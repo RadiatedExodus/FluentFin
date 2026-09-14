@@ -115,6 +115,7 @@ public partial class App : Application
 			services.AddSingleton<IBandwidthMeasurementCache, BandwidthMeasurementCache>();
 			services.AddSingleton<IImageSourceCache, ImageSourceCache>();
 			services.AddSingleton<IBlurHashCache, BlurHashCache>();
+			services.AddSingleton<IWindowsMediaSessionService, WindowsMediaSessionService>();
 			services.AddSingleton<IPlaybackEngineManager, PlaybackEngineManager>();
 			services.AddSingleton<IHostedPlaybackEngineRegistry>(sp => (PlaybackEngineManager)sp.GetRequiredService<IPlaybackEngineManager>());
 			services.AddSingleton<IPlaybackPresentationManager, PlaybackPresentationManager>();
@@ -138,6 +139,10 @@ public partial class App : Application
 			services.AddSingleton<IMainWindowViewModel, MainViewModel>();
 			services.AddSingleton<ITitleBarViewModel, TitleBarViewModel>();
 			services.AddTransient<HomeViewModel>();
+			services.AddTransient<MusicLibraryViewModel>();
+			services.AddTransient<MusicAlbumListViewModel>();
+			services.AddTransient<MusicAlbumViewModel>();
+			services.AddSingleton<MusicPlaybackViewModel>();
 			services.AddTransient<LibraryViewModel>();
 			services.AddTransient<VideoPlayerViewModel>();
 			services.AddTransient<MovieViewModel>();
@@ -247,6 +252,7 @@ public partial class App : Application
 
 		await Host.StartAsync();
 		GetService<ILogger<App>>().LogInformation("Host services started");
+		GetService<IWindowsMediaSessionService>().Initialize();
 	}
 
 	private static bool IsPackaged()
@@ -264,6 +270,7 @@ public partial class App : Application
 
 	private async void MainWindow_Closed(object sender, WindowEventArgs args)
 	{
+		GetService<IWindowsMediaSessionService>().Dispose();
 		await Host.StopAsync();
 		await GetService<IJellyfinClient>().Stop();
 	}

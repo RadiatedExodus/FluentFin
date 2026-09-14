@@ -25,3 +25,9 @@ public sealed class QueueItemChangedEventArgs(int index) : EventArgs
 {
 	public int Index { get; } = index;
 }
+
+public sealed class PlaybackQueueChangedEventArgs(IReadOnlyList<PlaybackItem> items, int currentIndex) : EventArgs
+{
+	public IReadOnlyList<PlaybackItem> Items { get; } = items;
+	public int CurrentIndex { get; } = currentIndex;
+}

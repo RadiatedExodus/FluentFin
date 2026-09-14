@@ -114,6 +114,21 @@
 	  <Page Update="Controls\BaseItemDtoCard.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>
+	  <Page Update="Controls\MusicAlbumCategoryRail.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Controls\MusicAlbumCard.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Controls\MusicMiniPlayer.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Controls\MusicExpandedPlayer.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Controls\MusicQueuePanel.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -324,6 +339,15 @@
 
 	<ItemGroup>
 	  <Page Update="Views\HomePage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Views\MusicLibraryPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Views\MusicAlbumListPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
+	  <Page Update="Views\MusicAlbumPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>
 	</ItemGroup>
