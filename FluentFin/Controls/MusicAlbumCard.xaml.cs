@@ -37,7 +37,7 @@ public sealed partial class MusicAlbumCard : UserControl
 			return;
 		}
 
-		if (Model.Dto.Type is BaseItemDto_Type.Audio or BaseItemDto_Type.Playlist)
+		if (Model.Dto.Type is BaseItemDto_Type.Audio)
 		{
 			App.Commands.PlayDtoCommand.Execute(Model.Dto);
 		}

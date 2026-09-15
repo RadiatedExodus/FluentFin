@@ -147,6 +147,7 @@ public partial class App : Application
 			services.AddTransient<MusicLibraryViewModel>();
 			services.AddTransient<MusicAlbumListViewModel>();
 			services.AddTransient<MusicAlbumViewModel>();
+			services.AddTransient<MusicPlaylistViewModel>();
 			services.AddTransient<MusicArtistViewModel>();
 			services.AddSingleton<MusicPlaybackViewModel>();
 			services.AddSingleton<MusicLyricsViewModel>();

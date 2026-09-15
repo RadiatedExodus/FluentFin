@@ -52,6 +52,12 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<BaseItemDto?> FindMusicArtistByName(string name, CancellationToken cancellationToken = default);
 
+		Task RenamePlaylist(BaseItemDto playlist, string newName, CancellationToken cancellationToken = default);
+
+		Task DeletePlaylist(BaseItemDto playlist, CancellationToken cancellationToken = default);
+
+		Task RemovePlaylistItems(Guid playlistId, IReadOnlyList<string> playlistItemIds, CancellationToken cancellationToken = default);
+
 		IAsyncEnumerable<RecentItemDtoQueryResult> GetRecentItemsFromUserLibraries(CancellationToken cancellationToken = default);
 
 		IAsyncEnumerable<BaseItemDto> GetUserLibraries();

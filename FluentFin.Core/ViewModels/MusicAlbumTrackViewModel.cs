@@ -5,9 +5,10 @@ namespace FluentFin.Core.ViewModels;
 
 public sealed class MusicAlbumTrackViewModel
 {
-	public MusicAlbumTrackViewModel(BaseItemDto dto, Func<string, Guid?, Task> openArtist)
+	public MusicAlbumTrackViewModel(BaseItemDto dto, Func<string, Guid?, Task> openArtist, int? displayNumber = null)
 	{
 		Dto = dto;
+		DisplayNumber = displayNumber;
 		foreach (var artist in CreateArtistLinks(dto, openArtist))
 		{
 			ArtistLinks.Add(artist);
@@ -15,6 +16,10 @@ public sealed class MusicAlbumTrackViewModel
 	}
 
 	public BaseItemDto Dto { get; }
+
+	public int? DisplayNumber { get; }
+
+	public string DisplayNumberText => (DisplayNumber ?? Dto.IndexNumber)?.ToString() ?? "";
 
 	public ObservableCollection<MusicArtistLinkViewModel> ArtistLinks { get; } = [];
 

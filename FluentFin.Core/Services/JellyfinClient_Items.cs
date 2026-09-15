@@ -219,6 +219,81 @@ public partial class JellyfinClient
 		}
 	}
 
+	public async Task RenamePlaylist(BaseItemDto playlist, string newName, CancellationToken cancellationToken = default)
+	{
+		if (playlist.Id is not { } id || string.IsNullOrWhiteSpace(newName))
+		{
+			logger.LogWarning("Jellyfin playlist rename skipped. PlaylistId={PlaylistId}, NewName={NewName}", playlist.Id, newName);
+			return;
+		}
+
+		try
+		{
+			var oldName = playlist.Name;
+			playlist.Name = newName.Trim();
+			logger.LogInformation("Jellyfin playlist rename started. PlaylistId={PlaylistId}, OldName={OldName}, NewName={NewName}", id, oldName, playlist.Name);
+			await _jellyfinApiClient.Items[id].PostAsync(playlist, cancellationToken: cancellationToken);
+			logger.LogInformation("Jellyfin playlist rename completed. PlaylistId={PlaylistId}, NewName={NewName}", id, playlist.Name);
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Jellyfin playlist rename failed. PlaylistId={PlaylistId}, NewName={NewName}", id, newName);
+		}
+	}
+
+	public async Task DeletePlaylist(BaseItemDto playlist, CancellationToken cancellationToken = default)
+	{
+		if (playlist.Id is not { } id)
+		{
+			logger.LogWarning("Jellyfin playlist delete skipped because playlist id is missing");
+			return;
+		}
+
+		try
+		{
+			logger.LogInformation("Jellyfin playlist delete started. PlaylistId={PlaylistId}, PlaylistName={PlaylistName}", id, playlist.Name);
+			await _jellyfinApiClient.Items[id].DeleteAsync(cancellationToken: cancellationToken);
+			logger.LogInformation("Jellyfin playlist delete completed. PlaylistId={PlaylistId}", id);
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Jellyfin playlist delete failed. PlaylistId={PlaylistId}", id);
+		}
+	}
+
+	public async Task RemovePlaylistItems(Guid playlistId, IReadOnlyList<string> playlistItemIds, CancellationToken cancellationToken = default)
+	{
+		var entryIds = playlistItemIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+		if (entryIds.Count == 0)
+		{
+			logger.LogWarning("Jellyfin playlist item removal skipped because no playlist entry ids were provided. PlaylistId={PlaylistId}", playlistId);
+			return;
+		}
+
+		try
+		{
+			logger.LogInformation("Jellyfin playlist item removal started. PlaylistId={PlaylistId}, EntryCount={EntryCount}", playlistId, entryIds.Count);
+			await _jellyfinApiClient.Playlists[playlistId].Items.DeleteAsync(x => x.QueryParameters.EntryIds = [.. entryIds], cancellationToken);
+			logger.LogInformation("Jellyfin playlist item removal completed. PlaylistId={PlaylistId}, EntryCount={EntryCount}", playlistId, entryIds.Count);
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogError(ex, "Jellyfin playlist item removal failed. PlaylistId={PlaylistId}, EntryCount={EntryCount}", playlistId, entryIds.Count);
+		}
+	}
+
 	public async Task ResetProgress(Guid id)
 	{
 		var dto = await GetItem(id);

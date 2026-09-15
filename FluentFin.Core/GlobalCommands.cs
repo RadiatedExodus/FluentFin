@@ -105,6 +105,9 @@ public partial class GlobalCommands(INavigationServiceCore navigationService,
 			case BaseItemDto_Type.MusicArtist:
 				navigationService.NavigateTo<MusicArtistViewModel>(dto);
 				break;
+			case BaseItemDto_Type.Playlist:
+				navigationService.NavigateTo<MusicPlaylistViewModel>(dto);
+				break;
 			case BaseItemDto_Type.CollectionFolder when dto.CollectionType is BaseItemDto_CollectionType.Music:
 				navigationService.NavigateTo<MusicAlbumListViewModel>(CreateMusicLibraryAlbumListParameter(dto));
 				break;

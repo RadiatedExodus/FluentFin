@@ -353,6 +353,9 @@
 	  <Page Update="Views\MusicAlbumPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>
+	  <Page Update="Views\MusicPlaylistPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
 	  <Page Update="Views\MusicArtistPage.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>

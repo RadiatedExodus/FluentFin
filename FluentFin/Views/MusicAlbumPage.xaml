@@ -118,7 +118,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock
                                 VerticalAlignment="Center"
-                                Text="{x:Bind Dto.IndexNumber, Mode=OneWay}" />
+                                Text="{x:Bind DisplayNumberText, Mode=OneWay}" />
                             <TextBlock
                                 Grid.Column="1"
                                 VerticalAlignment="Center"

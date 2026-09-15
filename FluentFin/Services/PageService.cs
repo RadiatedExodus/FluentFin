@@ -32,6 +32,7 @@ public class PageService : IPageService, IPageRegistration
 		Configure<MusicLibraryViewModel, MusicLibraryPage>();
 		Configure<MusicAlbumListViewModel, MusicAlbumListPage>();
 		Configure<MusicAlbumViewModel, MusicAlbumPage>();
+		Configure<MusicPlaylistViewModel, MusicPlaylistPage>();
 		Configure<MusicArtistViewModel, MusicArtistPage>();
 		Configure<LibraryViewModel, LibraryPage>();
 		Configure<VideoPlayerViewModel, VideoPlayerPage>();
@@ -68,6 +69,7 @@ public class PageService : IPageService, IPageRegistration
 		ConfigureParent<MusicLibraryViewModel, LibrariesLandingPageViewModel>();
 		ConfigureParent<MusicAlbumListViewModel, MusicLibraryViewModel>();
 		ConfigureParent<MusicAlbumViewModel, MusicLibraryViewModel>();
+		ConfigureParent<MusicPlaylistViewModel, MusicLibraryViewModel>();
 		ConfigureParent<MusicArtistViewModel, MusicLibraryViewModel>();
 
 		pluginManager.ConfigurePages(this);
