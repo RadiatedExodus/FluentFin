@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using FluentFin.Contracts.Services;
@@ -14,11 +15,14 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 {
 	private const long MaxCacheSizeBytes = 512L * 1024 * 1024;
 	private static readonly TimeSpan UntaggedTimeToLive = TimeSpan.FromHours(24);
+	private static readonly TimeSpan MissingImageRetryDelay = TimeSpan.FromHours(1);
+	private static readonly TimeSpan FailedImageRetryDelay = TimeSpan.FromMinutes(5);
 
 	private readonly ILogger<ImageSourceCache> _logger;
 	private readonly string _cachePath;
 	private readonly HttpClient _httpClient = new();
 	private readonly ConcurrentDictionary<string, Lazy<Task<Uri?>>> _downloads = [];
+	private readonly ConcurrentDictionary<string, DateTimeOffset> _failedUntil = [];
 	private readonly Dictionary<string, BitmapImage> _cache = [];
 	private readonly Queue<string> _memoryOrder = [];
 	private readonly Lock _lock = new();
@@ -79,6 +83,11 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 			return cached;
 		}
 
+		if (IsTemporarilyFailed(key, uri))
+		{
+			return uri;
+		}
+
 		var lazy = _downloads.GetOrAdd(key, _ => new Lazy<Task<Uri?>>(() => DownloadAsync(uri, key, CancellationToken.None)));
 		try
 		{
@@ -124,6 +133,7 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 			_cache.Clear();
 			_memoryOrder.Clear();
 		}
+		_failedUntil.Clear();
 
 		Directory.CreateDirectory(_cachePath);
 		foreach (var file in Directory.EnumerateFiles(_cachePath))
@@ -154,6 +164,7 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 			_cache.Clear();
 			_memoryOrder.Clear();
 		}
+		_failedUntil.Clear();
 	}
 
 	private async Task<Uri?> DownloadAsync(Uri uri, string key, CancellationToken cancellationToken)
@@ -169,6 +180,7 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 			if (!response.IsSuccessStatusCode)
 			{
 				_logger.LogWarning("Image download failed. Uri={Uri}, StatusCode={StatusCode}", uri, response.StatusCode);
+				MarkFailed(key, response.StatusCode == HttpStatusCode.NotFound ? MissingImageRetryDelay : FailedImageRetryDelay);
 				return uri;
 			}
 
@@ -187,6 +199,7 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 
 			File.Move(tempFile, finalFile);
 			File.SetLastAccessTimeUtc(finalFile, DateTime.UtcNow);
+			_failedUntil.TryRemove(key, out _);
 			_logger.LogInformation("Image cached. Uri={Uri}, File={File}, Bytes={Bytes}", uri, finalFile, new FileInfo(finalFile).Length);
 			_ = Task.Run(() => PruneCache());
 			return new Uri(finalFile);
@@ -198,6 +211,7 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 		catch (Exception ex)
 		{
 			_logger.LogWarning(ex, "Image download failed. Uri={Uri}", uri);
+			MarkFailed(key, FailedImageRetryDelay);
 			return uri;
 		}
 		finally
@@ -230,6 +244,28 @@ public sealed class ImageSourceCache : IImageSourceCache, IClientImageCacheMaint
 
 		cachedUri = null!;
 		return false;
+	}
+
+	private bool IsTemporarilyFailed(string key, Uri uri)
+	{
+		if (!_failedUntil.TryGetValue(key, out var retryAfter))
+		{
+			return false;
+		}
+
+		if (DateTimeOffset.UtcNow >= retryAfter)
+		{
+			_failedUntil.TryRemove(key, out _);
+			return false;
+		}
+
+		_logger.LogDebug("Image download skipped due to recent failure. Uri={Uri}, RetryAfter={RetryAfter}", uri, retryAfter);
+		return true;
+	}
+
+	private void MarkFailed(string key, TimeSpan retryDelay)
+	{
+		_failedUntil[key] = DateTimeOffset.UtcNow.Add(retryDelay);
 	}
 
 	private static bool CanCache(Uri uri) => uri.Scheme is "http" or "https";

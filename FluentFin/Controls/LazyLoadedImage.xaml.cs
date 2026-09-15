@@ -1,5 +1,6 @@
 using CommunityToolkit.WinUI;
 using FluentFin.Contracts.Services;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -12,8 +13,10 @@ namespace FluentFin.Controls;
 
 public sealed partial class LazyLoadedImage : UserControl
 {
+	private readonly ILogger<LazyLoadedImage> _logger;
 	private CancellationTokenSource _loadCts;
 	private long _loadVersion;
+	private string _currentImageUri = "";
 
 	public static readonly DependencyProperty ImageUriProperty = DependencyProperty.Register(
 		nameof(ImageUri),
@@ -24,6 +27,7 @@ public sealed partial class LazyLoadedImage : UserControl
 	public LazyLoadedImage()
 	{
 		InitializeComponent();
+		_logger = App.GetService<ILogger<LazyLoadedImage>>();
 
 		ImageFadeIn.Completed += (object sender, object e) =>
 		{
@@ -58,18 +62,27 @@ public sealed partial class LazyLoadedImage : UserControl
 	{
 		if (d is LazyLoadedImage image)
 		{
-			image.StartImageUriLoad(e.NewValue as Uri);
+			var oldUri = e.OldValue as Uri;
+			var newUri = e.NewValue as Uri;
+			if (string.Equals(oldUri?.ToString(), newUri?.ToString(), StringComparison.Ordinal))
+			{
+				return;
+			}
+
+			image.StartImageUriLoad(newUri);
 		}
 	}
 
 	private void ImageOpened(object sender, RoutedEventArgs e)
 	{
+		_logger.LogInformation("Lazy image opened. Uri={Uri}", _currentImageUri);
 		FailedTemplate.Visibility = Visibility.Collapsed;
 		ImageFadeIn.Begin();
 	}
 
 	private void ImageFailed(object sender, ExceptionRoutedEventArgs e)
 	{
+		_logger.LogWarning("Lazy image failed. Uri={Uri}, Error={Error}", _currentImageUri, e.ErrorMessage);
 		ShowFailed();
 	}
 
@@ -88,6 +101,13 @@ public sealed partial class LazyLoadedImage : UserControl
 
 	private void StartImageUriLoad(Uri uri)
 	{
+		var uriText = uri?.ToString() ?? "";
+		if (string.Equals(_currentImageUri, uriText, StringComparison.Ordinal))
+		{
+			return;
+		}
+
+		_currentImageUri = uriText;
 		_loadCts?.Cancel();
 		var version = Interlocked.Increment(ref _loadVersion);
 
@@ -97,10 +117,13 @@ public sealed partial class LazyLoadedImage : UserControl
 
 		if (uri is null)
 		{
-			Image.Source = ImageSource;
+			_logger.LogInformation("Lazy image load skipped because image URI is null. HasImageSource={HasImageSource}, HasBlurHash={HasBlurHash}",
+				ImageSource is not null,
+				BlurHashImageSource is not null);
 			return;
 		}
 
+		_logger.LogInformation("Lazy image load started. Uri={Uri}", uri);
 		var cts = new CancellationTokenSource();
 		_loadCts = cts;
 		_ = LoadImageUriAsync(uri, version, cts.Token);
@@ -119,17 +142,34 @@ public sealed partial class LazyLoadedImage : UserControl
 
 			if (cachedUri is null)
 			{
+				_logger.LogWarning("Lazy image cache returned no URI. Uri={Uri}", uri);
 				ShowFailed();
 				return;
 			}
 
-			Image.Source = new BitmapImage(cachedUri);
+			_logger.LogInformation("Lazy image source resolved. Uri={Uri}, ResolvedUri={ResolvedUri}, IsFile={IsFile}",
+				uri,
+				cachedUri,
+				cachedUri.IsFile);
+			var imageSource = new BitmapImage(cachedUri);
+			if (!DispatcherQueue.TryEnqueue(() =>
+			{
+				if (version == _loadVersion && !cancellationToken.IsCancellationRequested)
+				{
+					ImageSource = imageSource;
+				}
+			}))
+			{
+				_logger.LogWarning("Lazy image source could not be queued on the UI thread. Uri={Uri}", uri);
+				ShowFailed();
+			}
 		}
 		catch (OperationCanceledException) { }
-		catch
+		catch (Exception ex)
 		{
 			if (version == _loadVersion)
 			{
+				_logger.LogWarning(ex, "Lazy image load failed before source assignment. Uri={Uri}", uri);
 				ShowFailed();
 			}
 		}

@@ -314,7 +314,9 @@ public partial class MusicPlaybackViewModel : ObservableObject
 
 	private void RefreshPlaybackState()
 	{
+		var previousItemId = CurrentItem?.JellyfinId;
 		CurrentItem = _playbackService.CurrentItem;
+		var currentItemChanged = previousItemId != CurrentItem?.JellyfinId;
 		State = _playbackService.State;
 		Position = _playbackService.Position;
 		Duration = _playbackService.Duration;
@@ -334,7 +336,12 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		OnPropertyChanged(nameof(TrackTitle));
 		OnPropertyChanged(nameof(AlbumTitle));
 		OnPropertyChanged(nameof(ArtistText));
-		RefreshArtistLinks();
+		if (currentItemChanged)
+		{
+			RefreshArtistLinks();
+			OnPropertyChanged(nameof(Artwork));
+			OnPropertyChanged(nameof(ArtworkUri));
+		}
 		OnPropertyChanged(nameof(PositionText));
 		OnPropertyChanged(nameof(DurationText));
 		OnPropertyChanged(nameof(PlayPauseGlyph));
@@ -342,8 +349,6 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		OnPropertyChanged(nameof(LoadingVisibility));
 		OnPropertyChanged(nameof(RepeatGlyph));
 		OnPropertyChanged(nameof(RepeatToolTip));
-		OnPropertyChanged(nameof(Artwork));
-		OnPropertyChanged(nameof(ArtworkUri));
 		OnPropertyChanged(nameof(VolumePercentValue));
 	}
 
