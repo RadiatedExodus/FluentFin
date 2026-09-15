@@ -12,6 +12,7 @@ public sealed class VlcPlaybackEngine(ILogger<VlcPlaybackEngine> logger) : IMedi
 	private Media? _media;
 	private TimeSpan _position;
 	private TimeSpan _duration;
+	private int? _pendingDefaultAudioTrackIndex;
 	private bool _disposed;
 
 	public string Id => "Vlc";
@@ -54,6 +55,7 @@ public sealed class VlcPlaybackEngine(ILogger<VlcPlaybackEngine> logger) : IMedi
 	public event EventHandler? MediaEnded;
 	public event EventHandler? MediaLoaded;
 	public event EventHandler<PlaybackErrorEventArgs>? PlaybackFailed;
+	public event EventHandler? AudioTracksChanged;
 
 	public void AttachVideoView(LibVLCSharp.Platforms.Windows.VideoView view, string[] swapChainOptions)
 	{
@@ -94,21 +96,23 @@ public sealed class VlcPlaybackEngine(ILogger<VlcPlaybackEngine> logger) : IMedi
 		_media?.Dispose();
 		_media = new Media(_libVlc, source.Uri);
 		logger.LogInformation("VLC opening media source. Uri={Uri}, MediaSourceId={MediaSourceId}", source.Uri, source.MediaSourceId);
-		if (!_player.Play(_media))
-		{
-			throw new InvalidOperationException("VLC could not open the media source.");
-		}
+		_player.Media = _media;
+		MediaLoaded?.Invoke(this, EventArgs.Empty);
+		AudioTracksChanged?.Invoke(this, EventArgs.Empty);
 
 		if (source.DefaultAudioStreamIndex > 0)
 		{
-			OpenAudioTrack(source.DefaultAudioStreamIndex);
+			_pendingDefaultAudioTrackIndex = source.DefaultAudioStreamIndex;
 		}
 	}
 
 	public async Task PlayAsync(CancellationToken cancellationToken = default)
 	{
 		await _viewAttached.Task.WaitAsync(cancellationToken);
-		_player?.Play();
+		if (_player is not null && !_player.Play())
+		{
+			throw new InvalidOperationException("VLC could not start playback.");
+		}
 	}
 
 	public async Task PauseAsync(CancellationToken cancellationToken = default)
@@ -187,9 +191,19 @@ public sealed class VlcPlaybackEngine(ILogger<VlcPlaybackEngine> logger) : IMedi
 	{
 		_duration = TimeSpan.FromMilliseconds(e.Length);
 		DurationChanged?.Invoke(this, new DurationChangedEventArgs(_duration));
+		AudioTracksChanged?.Invoke(this, EventArgs.Empty);
+		if (_pendingDefaultAudioTrackIndex is { } defaultAudioTrackIndex)
+		{
+			_pendingDefaultAudioTrackIndex = null;
+			OpenAudioTrack(defaultAudioTrackIndex);
+		}
 	}
 
-	private void OnMediaChanged(object? sender, MediaPlayerMediaChangedEventArgs e) => MediaLoaded?.Invoke(this, EventArgs.Empty);
+	private void OnMediaChanged(object? sender, MediaPlayerMediaChangedEventArgs e)
+	{
+		MediaLoaded?.Invoke(this, EventArgs.Empty);
+		AudioTracksChanged?.Invoke(this, EventArgs.Empty);
+	}
 	private void OnVolumeChanged(object? sender, MediaPlayerVolumeChangedEventArgs e) => StateChanged?.Invoke(this, new PlaybackStateChangedEventArgs(State));
 
 	private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

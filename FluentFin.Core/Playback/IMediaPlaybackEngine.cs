@@ -50,6 +50,8 @@ public interface ISubtitlePlayback
 
 public interface IAudioTrackPlayback
 {
+	event EventHandler? AudioTracksChanged;
+
 	int? AudioTrackIndex { get; }
 	IEnumerable<AudioTrack> GetAudioTracks();
 	void OpenAudioTrack(int index);

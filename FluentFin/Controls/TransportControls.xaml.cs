@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows.Input;
 using CommunityToolkit.WinUI;
-using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.Playback;
 using FluentFin.ViewModels;
 using Microsoft.UI.Xaml;
@@ -19,6 +19,8 @@ public sealed partial class TransportControls : UserControl
 	private bool _resumePlaybackAfterSliderSeek;
 	private TimeSpan? _pendingSliderSeek;
 	private DateTimeOffset _holdSliderPositionUntil;
+	private ObservableCollection<AudioTrack>? _subscribedAudioTracks;
+	private ObservableCollection<SubtitleTrack>? _subscribedSubtitleTracks;
 
 	[GeneratedDependencyProperty]
 	public partial bool IsSkipButtonVisible { get; set; }
@@ -31,9 +33,6 @@ public sealed partial class TransportControls : UserControl
 
 	[GeneratedDependencyProperty]
 	public partial TrickplayViewModel? Trickplay { get; set; }
-
-	[GeneratedDependencyProperty]
-	public partial IJellyfinClient? JellyfinClient { get; set; }
 
 	[GeneratedDependencyProperty]
 	public partial PlaybackState PlaybackState { get; set; }
@@ -87,6 +86,9 @@ public sealed partial class TransportControls : UserControl
 	public partial ICommand? StopCommand { get; set; }
 
 	[GeneratedDependencyProperty]
+	public partial ICommand? CastCommand { get; set; }
+
+	[GeneratedDependencyProperty]
 	public partial ICommand? ToggleFullscreenCommand { get; set; }
 
 	[GeneratedDependencyProperty]
@@ -128,10 +130,43 @@ public sealed partial class TransportControls : UserControl
 		Subtitles.Visibility = string.IsNullOrWhiteSpace(newValue) ? Visibility.Collapsed : Visibility.Visible;
 	}
 
-	partial void OnAudioTracksChanged(ObservableCollection<AudioTrack>? newValue) => RefreshAudioFlyout();
-	partial void OnSubtitleTracksChanged(ObservableCollection<SubtitleTrack>? newValue) => RefreshSubtitleFlyout();
+	partial void OnAudioTracksChanged(ObservableCollection<AudioTrack>? newValue)
+	{
+		if (_subscribedAudioTracks is not null)
+		{
+			_subscribedAudioTracks.CollectionChanged -= AudioTracks_CollectionChanged;
+		}
+
+		_subscribedAudioTracks = newValue;
+		if (_subscribedAudioTracks is not null)
+		{
+			_subscribedAudioTracks.CollectionChanged += AudioTracks_CollectionChanged;
+		}
+
+		RefreshAudioFlyout();
+	}
+
+	partial void OnSubtitleTracksChanged(ObservableCollection<SubtitleTrack>? newValue)
+	{
+		if (_subscribedSubtitleTracks is not null)
+		{
+			_subscribedSubtitleTracks.CollectionChanged -= SubtitleTracks_CollectionChanged;
+		}
+
+		_subscribedSubtitleTracks = newValue;
+		if (_subscribedSubtitleTracks is not null)
+		{
+			_subscribedSubtitleTracks.CollectionChanged += SubtitleTracks_CollectionChanged;
+		}
+
+		RefreshSubtitleFlyout();
+	}
+
 	partial void OnSelectedAudioTrackIndexChanged(int? newValue) => RefreshAudioFlyout();
 	partial void OnSelectedSubtitleTrackIndexChanged(int? newValue) => RefreshSubtitleFlyout();
+
+	private void AudioTracks_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshAudioFlyout();
+	private void SubtitleTracks_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) => RefreshSubtitleFlyout();
 
 	private static string TimeRemaining(TimeSpan currentTime, TimeSpan duration)
 	{
@@ -258,9 +293,9 @@ public sealed partial class TransportControls : UserControl
 
 	private void CastButton_Click(object sender, RoutedEventArgs e)
 	{
-		if (StopCommand?.CanExecute(null) == true)
+		if (CastCommand?.CanExecute(null) == true)
 		{
-			StopCommand.Execute(null);
+			CastCommand.Execute(null);
 		}
 	}
 

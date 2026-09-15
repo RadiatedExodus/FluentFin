@@ -84,6 +84,7 @@ public sealed class MpvPlaybackEngine(
 	public event EventHandler? MediaLoaded;
 	public event EventHandler<PlaybackErrorEventArgs>? PlaybackFailed;
 	public event EventHandler? VideoOutputChanged;
+	public event EventHandler? AudioTracksChanged;
 
 	public async Task OpenAsync(MediaSource source, CancellationToken cancellationToken = default)
 	{
@@ -362,6 +363,7 @@ public sealed class MpvPlaybackEngine(
 				break;
 			case "track-list":
 				logger.LogDebug("mpv track list changed. TrackCount={TrackCount}", _mpv?.GetTracks().Count ?? 0);
+				AudioTracksChanged?.Invoke(this, EventArgs.Empty);
 				break;
 		}
 	}

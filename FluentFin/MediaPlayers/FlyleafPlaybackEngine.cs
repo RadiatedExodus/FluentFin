@@ -11,9 +11,12 @@ namespace FluentFin.MediaPlayers;
 
 public sealed class FlyleafPlaybackEngine : IMediaPlaybackEngine, ISubtitlePlayback, IAudioTrackPlayback, ISubtitleTextPlayback
 {
+	private static readonly TimeSpan PositionNotificationInterval = TimeSpan.FromMilliseconds(250);
+
 	private readonly Player _player = new();
 	private readonly CompositeDisposable _subscriptions = [];
 	private readonly ILogger<FlyleafPlaybackEngine> _logger;
+	private readonly SemaphoreSlim _operationGate = new(1, 1);
 	private bool _disposed;
 
 	public Player Player => _player;
@@ -47,99 +50,105 @@ public sealed class FlyleafPlaybackEngine : IMediaPlaybackEngine, ISubtitlePlayb
 	public event EventHandler? MediaLoaded;
 	public event EventHandler<PlaybackErrorEventArgs>? PlaybackFailed;
 	public event EventHandler<string>? SubtitleTextChanged;
+	public event EventHandler? AudioTracksChanged;
 
 	public FlyleafPlaybackEngine(ILogger<FlyleafPlaybackEngine> logger)
 	{
 		_logger = logger;
 		_player.Config.Player.KeyBindings.RemoveAll();
 		_player.WhenAnyValue(x => x.Status)
+			.DistinctUntilChanged()
 			.Subscribe(OnStatusChanged)
 			.DisposeWith(_subscriptions);
 		_player.WhenAnyValue(x => x.CurTime)
 			.Select(x => new TimeSpan(x))
+			.DistinctUntilChanged()
+			.Sample(PositionNotificationInterval)
 			.Subscribe(position => PositionChanged?.Invoke(this, new PositionChangedEventArgs(position)))
 			.DisposeWith(_subscriptions);
 		_player.WhenAnyValue(x => x.Duration)
 			.Select(x => new TimeSpan(x))
+			.DistinctUntilChanged()
 			.Subscribe(duration => DurationChanged?.Invoke(this, new DurationChangedEventArgs(duration)))
 			.DisposeWith(_subscriptions);
 		_player.WhenAnyValue(x => x.Subtitles.SubsText)
+			.DistinctUntilChanged()
 			.Subscribe(text => SubtitleTextChanged?.Invoke(this, text ?? ""))
+			.DisposeWith(_subscriptions);
+		_player.Audio.Streams.ToObservableChangeSet()
+			.Subscribe(_ => AudioTracksChanged?.Invoke(this, EventArgs.Empty))
 			.DisposeWith(_subscriptions);
 	}
 
-	public Task OpenAsync(MediaSource source, CancellationToken cancellationToken = default)
+	public async Task OpenAsync(MediaSource source, CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		_logger.LogInformation("Flyleaf opening media source. Uri={Uri}, MediaSourceId={MediaSourceId}", source.Uri, source.MediaSourceId);
-		var args = _player.Open(HttpUtility.UrlDecode(source.Uri.ToString()));
+		var args = await RunPlayerOperationAsync(() => _player.Open(HttpUtility.UrlDecode(source.Uri.ToString())), cancellationToken);
 		if (!args.Success)
 		{
 			throw new InvalidOperationException("Flyleaf could not open the media source.");
 		}
 
 		MediaLoaded?.Invoke(this, EventArgs.Empty);
+		AudioTracksChanged?.Invoke(this, EventArgs.Empty);
 		if (source.DefaultAudioStreamIndex > 0)
 		{
-			OpenAudioTrack(source.DefaultAudioStreamIndex);
+			_ = RunPlayerOperationAsync(() => OpenAudioTrackCore(source.DefaultAudioStreamIndex), CancellationToken.None);
 		}
-
-		return Task.CompletedTask;
 	}
 
 	public Task PlayAsync(CancellationToken cancellationToken = default)
 	{
-		cancellationToken.ThrowIfCancellationRequested();
-		_player.Play();
-		return Task.CompletedTask;
+		return RunPlayerOperationAsync(_player.Play, cancellationToken);
 	}
 
 	public Task PauseAsync(CancellationToken cancellationToken = default)
 	{
-		cancellationToken.ThrowIfCancellationRequested();
-		_player.Pause();
-		return Task.CompletedTask;
+		return RunPlayerOperationAsync(_player.Pause, cancellationToken);
 	}
 
 	public Task StopAsync(CancellationToken cancellationToken = default)
 	{
-		cancellationToken.ThrowIfCancellationRequested();
-		_player.Stop();
-		return Task.CompletedTask;
+		return RunPlayerOperationOnUiAsync(_player.Stop, cancellationToken);
 	}
 
 	public Task SeekAsync(TimeSpan position, CancellationToken cancellationToken = default)
 	{
-		cancellationToken.ThrowIfCancellationRequested();
-		_player.SeekAccurate((int)position.TotalMilliseconds);
-		return Task.CompletedTask;
+		return RunPlayerOperationAsync(() => _player.SeekAccurate((int)position.TotalMilliseconds), cancellationToken);
 	}
 
 	public void OpenExternalSubtitleTrack(string url)
 	{
-		_player.Config.Subtitles.Enabled = true;
-		_player.Open(url, forceSubtitles: true);
+		_ = RunPlayerOperationAsync(() =>
+		{
+			_player.Config.Subtitles.Enabled = true;
+			_player.Open(url, forceSubtitles: true);
+		}, CancellationToken.None);
 	}
 
 	public void OpenInternalSubtitleTrack(int trackIndex, int subtitleIndex)
 	{
-		_player.Config.Subtitles.Enabled = true;
-		if (subtitleIndex >= 0 && subtitleIndex < _player.Subtitles.Streams.Count)
+		_ = RunPlayerOperationAsync(() =>
 		{
-			_player.Open(_player.Subtitles.Streams[subtitleIndex]);
-		}
+			_player.Config.Subtitles.Enabled = true;
+			if (subtitleIndex >= 0 && subtitleIndex < _player.Subtitles.Streams.Count)
+			{
+				_player.Open(_player.Subtitles.Streams[subtitleIndex]);
+			}
+		}, CancellationToken.None);
 	}
 
-	public void DisableSubtitles() => _player.Config.Subtitles.Enabled = false;
+	public void DisableSubtitles()
+	{
+		_ = RunPlayerOperationAsync(() => _player.Config.Subtitles.Enabled = false, CancellationToken.None);
+	}
 
 	public IEnumerable<AudioTrack> GetAudioTracks() => _player.Audio.Streams.Select(x => new AudioTrack(x.StreamIndex, x.Language.TopEnglishName, x.Title));
 
 	public void OpenAudioTrack(int index)
 	{
-		if (_player.Audio.Streams.FirstOrDefault(x => x.StreamIndex == index) is { } stream)
-		{
-			_player.Open(stream);
-		}
+		_ = RunPlayerOperationAsync(() => OpenAudioTrackCore(index), CancellationToken.None);
 	}
 
 	public ValueTask DisposeAsync()
@@ -152,7 +161,82 @@ public sealed class FlyleafPlaybackEngine : IMediaPlaybackEngine, ISubtitlePlayb
 		_disposed = true;
 		_subscriptions.Dispose();
 		_player.Dispose();
+		_operationGate.Dispose();
 		return ValueTask.CompletedTask;
+	}
+
+	private void OpenAudioTrackCore(int index)
+	{
+		if (_player.Audio.Streams.FirstOrDefault(x => x.StreamIndex == index) is { } stream)
+		{
+			_player.Open(stream);
+		}
+	}
+
+	private async Task RunPlayerOperationAsync(Action operation, CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		await _operationGate.WaitAsync(cancellationToken);
+		try
+		{
+			await Task.Run(operation, cancellationToken);
+		}
+		finally
+		{
+			_operationGate.Release();
+		}
+	}
+
+	private async Task<T> RunPlayerOperationAsync<T>(Func<T> operation, CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		await _operationGate.WaitAsync(cancellationToken);
+		try
+		{
+			return await Task.Run(operation, cancellationToken);
+		}
+		finally
+		{
+			_operationGate.Release();
+		}
+	}
+
+	private async Task RunPlayerOperationOnUiAsync(Action operation, CancellationToken cancellationToken)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		await _operationGate.WaitAsync(cancellationToken);
+		try
+		{
+			var dispatcher = App.MainWindow.DispatcherQueue;
+			if (dispatcher.HasThreadAccess)
+			{
+				operation();
+				return;
+			}
+
+			var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			if (!dispatcher.TryEnqueue(() =>
+			{
+				try
+				{
+					operation();
+					completion.TrySetResult();
+				}
+				catch (Exception ex)
+				{
+					completion.TrySetException(ex);
+				}
+			}))
+			{
+				throw new InvalidOperationException("Flyleaf player operation could not be queued on the UI thread.");
+			}
+
+			await completion.Task.WaitAsync(cancellationToken);
+		}
+		finally
+		{
+			_operationGate.Release();
+		}
 	}
 
 	private void OnStatusChanged(Status status)

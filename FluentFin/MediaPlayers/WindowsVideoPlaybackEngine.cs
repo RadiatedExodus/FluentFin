@@ -55,11 +55,17 @@ public sealed class WindowsVideoPlaybackEngine : IMediaPlaybackEngine, ISubtitle
 	public event EventHandler? MediaEnded;
 	public event EventHandler? MediaLoaded;
 	public event EventHandler<PlaybackErrorEventArgs>? PlaybackFailed;
+	public event EventHandler? AudioTracksChanged;
 
 	public Task OpenAsync(FluentFin.Core.Playback.MediaSource source, CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		Logger.LogInformation("Windows video opening media source. Uri={Uri}, MediaSourceId={MediaSourceId}", source.Uri, source.MediaSourceId);
+		if (_mediaItem is not null)
+		{
+			_mediaItem.AudioTracksChanged -= OnAudioTracksChanged;
+		}
+
 		var mediaSource = Windows.Media.Core.MediaSource.CreateFromUri(source.Uri);
 		_mediaItem = new MediaPlaybackItem(mediaSource);
 		_mediaItem.AudioTracksChanged += OnAudioTracksChanged;
@@ -179,6 +185,11 @@ public sealed class WindowsVideoPlaybackEngine : IMediaPlaybackEngine, ISubtitle
 		_player.MediaOpened -= OnMediaOpened;
 		_player.MediaEnded -= OnMediaEnded;
 		_player.MediaFailed -= OnMediaFailed;
+		if (_mediaItem is not null)
+		{
+			_mediaItem.AudioTracksChanged -= OnAudioTracksChanged;
+		}
+
 		_player.Dispose();
 		return ValueTask.CompletedTask;
 	}
@@ -189,7 +200,7 @@ public sealed class WindowsVideoPlaybackEngine : IMediaPlaybackEngine, ISubtitle
 	private void OnMediaOpened(MediaPlayer sender, object args) => MediaLoaded?.Invoke(this, EventArgs.Empty);
 	private void OnMediaEnded(MediaPlayer sender, object args) => MediaEnded?.Invoke(this, EventArgs.Empty);
 	private void OnMediaFailed(MediaPlayer sender, MediaPlayerFailedEventArgs args) => PlaybackFailed?.Invoke(this, new PlaybackErrorEventArgs(args.ExtendedErrorCode, args.ErrorMessage));
-	private void OnAudioTracksChanged(MediaPlaybackItem sender, IVectorChangedEventArgs args) => MediaLoaded?.Invoke(this, EventArgs.Empty);
+	private void OnAudioTracksChanged(MediaPlaybackItem sender, IVectorChangedEventArgs args) => AudioTracksChanged?.Invoke(this, EventArgs.Empty);
 
 	private T SafeGetValue<T>(Func<MediaPlayer, T> getter, T defaultValue)
 	{

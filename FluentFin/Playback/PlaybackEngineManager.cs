@@ -33,16 +33,16 @@ public sealed class PlaybackEngineManager(
 		return Task.FromResult(ActiveEngine);
 	}
 
-	public async Task DeactivateAsync(CancellationToken cancellationToken = default)
+	public Task DeactivateAsync(CancellationToken cancellationToken = default)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		if (ActiveEngine is null)
 		{
-			return;
+			return Task.CompletedTask;
 		}
 
 		logger.LogInformation("Deactivating playback engine. EngineId={EngineId}", ActiveEngine.Id);
-		await ActiveEngine.StopAsync(cancellationToken);
 		ActiveEngine = null;
+		return Task.CompletedTask;
 	}
 }

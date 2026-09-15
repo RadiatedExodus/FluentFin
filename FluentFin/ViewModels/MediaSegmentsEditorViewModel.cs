@@ -108,8 +108,8 @@ public partial class MediaSegmentsEditorViewModel(
 	{
 		if (PlayingSegment is { } segment && playbackService.Position.Ticks > segment.EndTicks)
 		{
-			await playbackService.PauseAsync();
 			PlayingSegment = null;
+			await playbackService.PauseAsync();
 		}
 	}
 

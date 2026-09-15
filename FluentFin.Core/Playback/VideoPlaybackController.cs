@@ -18,6 +18,7 @@ public sealed class VideoPlaybackController(
 	private PlaybackProgressInfo_PlayMethod _playMethod;
 	private IReadOnlyList<AudioTrack> _audioTracks = [];
 	private IReadOnlyList<SubtitleTrack> _subtitleTracks = [];
+	private int? _selectedSubtitleTrackIndex;
 	private string _subtitleText = "";
 
 	public event EventHandler? TracksChanged;
@@ -31,18 +32,37 @@ public sealed class VideoPlaybackController(
 	public IReadOnlyList<AudioTrack> AudioTracks => _audioTracks;
 	public IReadOnlyList<SubtitleTrack> SubtitleTracks => _subtitleTracks;
 	public int? AudioTrackIndex => (_engine as IAudioTrackPlayback)?.AudioTrackIndex;
-	public int? SubtitleTrackIndex => (_engine as ISubtitlePlayback)?.SubtitleTrackIndex;
+	public int? SubtitleTrackIndex => _selectedSubtitleTrackIndex ?? (_engine as ISubtitlePlayback)?.SubtitleTrackIndex;
 	public string SubtitleText => _subtitleText;
 
 	public async Task PrepareAsync(PlaybackRequest request, IMediaPlaybackEngine engine, CancellationToken cancellationToken = default)
 	{
 		DetachEngine();
 		logger.LogInformation("VideoPlaybackController preparing item. ItemId={ItemId}, Title={Title}", request.StartItem.JellyfinId, request.StartItem.Title);
+		var playbackItem = request.StartItem;
+		if (playbackItem.Item.Id != playbackItem.JellyfinId || playbackItem.Item.MediaSources is null)
+		{
+			var hydrated = await jellyfinClient.GetItem(playbackItem.JellyfinId);
+			if (hydrated is not null)
+			{
+				playbackItem = PlaybackItem.FromDto(hydrated, PlaybackKind.Video);
+				request = new PlaybackRequest
+				{
+					Kind = request.Kind,
+					StartItem = playbackItem,
+					QueueItems = request.QueueItems,
+					StartIndex = request.StartIndex,
+					StartPosition = request.StartPosition
+				};
+				logger.LogInformation("VideoPlaybackController hydrated playback item. ItemId={ItemId}", playbackItem.JellyfinId);
+			}
+		}
+
 		_request = request;
 		_engine = engine;
 		AttachEngine(engine);
 
-		_mediaResponse = await jellyfinClient.GetMediaUrl(request.StartItem.Item, cancellationToken);
+		_mediaResponse = await jellyfinClient.GetMediaUrl(playbackItem.Item, cancellationToken);
 		if (_mediaResponse is null)
 		{
 			throw new InvalidOperationException($"No playable video source was returned for {request.StartItem.JellyfinId}.");
@@ -92,7 +112,6 @@ public sealed class VideoPlaybackController(
 		if (_engine is not null)
 		{
 			await _engine.PauseAsync(cancellationToken);
-			await ReportProgressAsync(cancellationToken);
 		}
 	}
 
@@ -101,14 +120,12 @@ public sealed class VideoPlaybackController(
 		if (_engine is not null)
 		{
 			await _engine.PlayAsync(cancellationToken);
-			await ReportProgressAsync(cancellationToken);
 		}
 	}
 
 	public async Task StopAsync(CancellationToken cancellationToken = default)
 	{
 		logger.LogInformation("VideoPlaybackController stopping item. ItemId={ItemId}", _request?.StartItem.JellyfinId);
-		await ReportProgressAsync(cancellationToken);
 		if (_engine is not null)
 		{
 			await _engine.StopAsync(cancellationToken);
@@ -120,6 +137,7 @@ public sealed class VideoPlaybackController(
 		_request = null;
 		_audioTracks = [];
 		_subtitleTracks = [];
+		_selectedSubtitleTrackIndex = null;
 		_subtitleText = "";
 		DetachEngine();
 		TracksChanged?.Invoke(this, EventArgs.Empty);
@@ -131,7 +149,6 @@ public sealed class VideoPlaybackController(
 		if (_engine is not null)
 		{
 			await _engine.SeekAsync(position, cancellationToken);
-			await ReportProgressAsync(cancellationToken);
 		}
 	}
 
@@ -154,12 +171,18 @@ public sealed class VideoPlaybackController(
 		cancellationToken.ThrowIfCancellationRequested();
 		if (_engine is not ISubtitlePlayback subtitles || _mediaResponse?.MediaSourceInfo.MediaStreams is not { } streams)
 		{
+			logger.LogWarning("VideoPlaybackController subtitle track request ignored because subtitle playback is unavailable. Index={Index}, ItemId={ItemId}, HasEngine={HasEngine}, HasMediaStreams={HasMediaStreams}",
+				index, _request?.StartItem.JellyfinId, _engine is not null, _mediaResponse?.MediaSourceInfo.MediaStreams is not null);
 			return;
 		}
 
 		var stream = streams.FirstOrDefault(x => x.Type is MediaStream_Type.Subtitle && x.Index == index);
 		if (stream is null)
 		{
+			logger.LogWarning("VideoPlaybackController subtitle track request could not find matching stream. Index={Index}, ItemId={ItemId}, SubtitleStreamIndexes={SubtitleStreamIndexes}",
+				index,
+				_request?.StartItem.JellyfinId,
+				string.Join(",", streams.Where(x => x.Type is MediaStream_Type.Subtitle).Select(x => x.Index?.ToString() ?? "<null>")));
 			return;
 		}
 
@@ -170,6 +193,8 @@ public sealed class VideoPlaybackController(
 		{
 			if (string.IsNullOrWhiteSpace(stream.DeliveryUrl))
 			{
+				logger.LogWarning("VideoPlaybackController external subtitle has no delivery URL. Index={Index}, ItemId={ItemId}",
+					index, _request?.StartItem.JellyfinId);
 				return;
 			}
 
@@ -184,8 +209,15 @@ public sealed class VideoPlaybackController(
 			{
 				subtitles.OpenInternalSubtitleTrack(trackIndex, subtitleIndex);
 			}
+			else
+			{
+				logger.LogWarning("VideoPlaybackController internal subtitle index could not be resolved. Index={Index}, ItemId={ItemId}",
+					index, _request?.StartItem.JellyfinId);
+				return;
+			}
 		}
 
+		_selectedSubtitleTrackIndex = index;
 		await ReportProgressAsync(cancellationToken);
 		TracksChanged?.Invoke(this, EventArgs.Empty);
 	}
@@ -197,6 +229,7 @@ public sealed class VideoPlaybackController(
 		{
 			logger.LogInformation("VideoPlaybackController subtitles disabled. ItemId={ItemId}", _request?.StartItem.JellyfinId);
 			subtitles.DisableSubtitles();
+			_selectedSubtitleTrackIndex = null;
 			await ReportProgressAsync(cancellationToken);
 			TracksChanged?.Invoke(this, EventArgs.Empty);
 		}
@@ -227,6 +260,11 @@ public sealed class VideoPlaybackController(
 	private void AttachEngine(IMediaPlaybackEngine engine)
 	{
 		engine.MediaLoaded += OnEngineMediaLoaded;
+		if (engine is IAudioTrackPlayback audioTrackPlayback)
+		{
+			audioTrackPlayback.AudioTracksChanged += OnAudioTracksChanged;
+		}
+
 		if (engine is ISubtitleTextPlayback subtitleText)
 		{
 			_subtitleTextPlayback = subtitleText;
@@ -240,6 +278,10 @@ public sealed class VideoPlaybackController(
 		if (_engine is not null)
 		{
 			_engine.MediaLoaded -= OnEngineMediaLoaded;
+			if (_engine is IAudioTrackPlayback audioTrackPlayback)
+			{
+				audioTrackPlayback.AudioTracksChanged -= OnAudioTracksChanged;
+			}
 		}
 
 		if (_subtitleTextPlayback is not null)
@@ -256,6 +298,8 @@ public sealed class VideoPlaybackController(
 		RefreshAudioTracks();
 		SelectDefaultSubtitle();
 	}
+
+	private void OnAudioTracksChanged(object? sender, EventArgs e) => RefreshAudioTracks();
 
 	private void OnSubtitleTextChanged(object? sender, string text)
 	{

@@ -12,7 +12,8 @@
         x:Name="Root"
         Background="Black"
         DoubleTapped="Root_DoubleTapped"
-        IsDoubleTapEnabled="True">
+        IsDoubleTapEnabled="True"
+        PointerMoved="Root_PointerMoved">
         <controls:VideoSurfaceHost Backend="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}" />
 
         <controls:TransportControls
@@ -20,10 +21,10 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
             AudioTracks="{x:Bind ViewModel.AudioTracks, Mode=OneWay}"
+            CastCommand="{x:Bind ViewModel.CastCommand, Mode=OneWay}"
             DisableSubtitlesCommand="{x:Bind ViewModel.DisableSubtitlesCommand, Mode=OneWay}"
             Duration="{x:Bind ViewModel.Duration, Mode=OneWay}"
             IsSkipButtonVisible="{x:Bind ViewModel.IsSkipButtonVisible, Mode=OneWay}"
-            JellyfinClient="{x:Bind ViewModel.JellyfinClient}"
             PlaybackState="{x:Bind ViewModel.PlaybackState, Mode=OneWay}"
             Playlist="{x:Bind ViewModel.Playlist, Mode=OneWay}"
             Position="{x:Bind ViewModel.Position, Mode=OneWay}"

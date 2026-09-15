@@ -5,6 +5,7 @@ namespace FluentFin.Core.Playback;
 public sealed class PlaybackService : IPlaybackService
 {
 	private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(20);
+	private static readonly TimeSpan PositionNotificationInterval = TimeSpan.FromMilliseconds(250);
 	private readonly IPlaybackEngineManager _engineManager;
 	private readonly ILogger<PlaybackService> _logger;
 	private readonly Dictionary<PlaybackKind, IPlaybackController> _controllers;
@@ -13,6 +14,9 @@ public sealed class PlaybackService : IPlaybackService
 	private IMediaPlaybackEngine? _activeEngine;
 	private PlaybackState? _stateOverride;
 	private CancellationTokenSource? _progressCts;
+	private bool _handlingMediaEnded;
+	private long _lastPositionNotificationTicks;
+	private TimeSpan _lastNotifiedPosition = TimeSpan.MinValue;
 
 	public event EventHandler? PlaybackChanged;
 	public event EventHandler? MediaLoaded;
@@ -47,7 +51,7 @@ public sealed class PlaybackService : IPlaybackService
 		await _gate.WaitAsync(cancellationToken);
 		try
 		{
-			await PlayCoreAsync(request, replaceQueue: true, cancellationToken);
+			await PlayCoreAsync(request, replaceQueue: true, cancellationToken: cancellationToken);
 		}
 		finally
 		{
@@ -83,19 +87,7 @@ public sealed class PlaybackService : IPlaybackService
 		try
 		{
 			_logger.LogInformation("PlaybackService StopAsync requested. Kind={Kind}, ItemId={ItemId}", CurrentKind, CurrentItem?.JellyfinId);
-			StopProgressLoop();
-			if (_activeController is { } controller)
-			{
-				await ReportProgressAsync(cancellationToken);
-				await controller.StopAsync(cancellationToken);
-			}
-
-			Queue.Clear();
-			_activeController = null;
-			_stateOverride = null;
-			DetachEngineEvents();
-			await _engineManager.DeactivateAsync(cancellationToken);
-			OnPlaybackChanged();
+			await StopCoreAsync(finalState: null, clearQueue: true, cancellationToken: cancellationToken);
 		}
 		finally
 		{
@@ -146,56 +138,17 @@ public sealed class PlaybackService : IPlaybackService
 
 	public async Task SkipNextAsync(CancellationToken cancellationToken = default)
 	{
-		if (Queue.Next() is null)
-		{
-			_logger.LogInformation("PlaybackService SkipNextAsync reached end of queue. Kind={Kind}", CurrentKind);
-			await StopAsync(cancellationToken);
-			return;
-		}
-
-		await PlayCurrentQueueItemAsync(cancellationToken);
-	}
-
-	public async Task SkipPreviousAsync(CancellationToken cancellationToken = default)
-	{
-		if (Queue.Previous() is null)
-		{
-			await SeekAsync(TimeSpan.Zero, cancellationToken);
-			return;
-		}
-
-		await PlayCurrentQueueItemAsync(cancellationToken);
-	}
-
-	public async Task SkipToAsync(int queueIndex, CancellationToken cancellationToken = default)
-	{
-		if (Queue.MoveTo(queueIndex) is null)
-		{
-			return;
-		}
-
-		await PlayCurrentQueueItemAsync(cancellationToken);
-	}
-
-	private async Task PlayCurrentQueueItemAsync(CancellationToken cancellationToken)
-	{
-		if (Queue.Current is not { } current)
-		{
-			return;
-		}
-
-		var request = new PlaybackRequest
-		{
-			Kind = current.Kind,
-			StartItem = current,
-			QueueItems = Queue.Items,
-			StartIndex = Queue.CurrentIndex
-		};
-
 		await _gate.WaitAsync(cancellationToken);
 		try
 		{
-			await PlayCoreAsync(request, replaceQueue: false, cancellationToken);
+			if (!Queue.CanMoveNext)
+			{
+				_logger.LogInformation("PlaybackService SkipNextAsync reached end of queue. Kind={Kind}", CurrentKind);
+				await StopCoreAsync(finalState: null, clearQueue: true, cancellationToken: cancellationToken);
+				return;
+			}
+
+			await PlayQueueIndexAsync(Queue.CurrentIndex + 1, cancellationToken);
 		}
 		finally
 		{
@@ -203,7 +156,73 @@ public sealed class PlaybackService : IPlaybackService
 		}
 	}
 
-	private async Task PlayCoreAsync(PlaybackRequest request, bool replaceQueue, CancellationToken cancellationToken)
+	public async Task SkipPreviousAsync(CancellationToken cancellationToken = default)
+	{
+		await _gate.WaitAsync(cancellationToken);
+		try
+		{
+			if (!Queue.CanMovePrevious)
+			{
+				_logger.LogInformation("PlaybackService SkipPreviousAsync reached start of queue. Seeking to beginning. Kind={Kind}", CurrentKind);
+				if (_activeController is { } controller)
+				{
+					await controller.SeekAsync(TimeSpan.Zero, cancellationToken);
+					await ReportProgressAsync(cancellationToken);
+					OnPlaybackChanged();
+				}
+				return;
+			}
+
+			await PlayQueueIndexAsync(Queue.CurrentIndex - 1, cancellationToken);
+		}
+		finally
+		{
+			_gate.Release();
+		}
+	}
+
+	public async Task SkipToAsync(int queueIndex, CancellationToken cancellationToken = default)
+	{
+		await _gate.WaitAsync(cancellationToken);
+		try
+		{
+			if (queueIndex < 0 || queueIndex >= Queue.Items.Count)
+			{
+				return;
+			}
+
+			await PlayQueueIndexAsync(queueIndex, cancellationToken);
+		}
+		finally
+		{
+			_gate.Release();
+		}
+	}
+
+	private Task PlayQueueIndexAsync(int queueIndex, CancellationToken cancellationToken)
+	{
+		if (queueIndex < 0 || queueIndex >= Queue.Items.Count)
+		{
+			return Task.CompletedTask;
+		}
+
+		var current = Queue.Items[queueIndex];
+		var request = new PlaybackRequest
+		{
+			Kind = current.Kind,
+			StartItem = current,
+			QueueItems = Queue.Items,
+			StartIndex = queueIndex
+		};
+
+		return PlayCoreAsync(request, replaceQueue: false, cancellationToken, forceTransition: true);
+	}
+
+	private async Task PlayCoreAsync(
+		PlaybackRequest request,
+		bool replaceQueue,
+		CancellationToken cancellationToken,
+		bool forceTransition = false)
 	{
 		_logger.LogInformation("PlaybackService PlayAsync requested. Kind={Kind}, ItemId={ItemId}, StartIndex={StartIndex}, QueueCount={QueueCount}",
 			request.Kind, request.StartItem.JellyfinId, request.StartIndex, request.EffectiveQueue.Count);
@@ -214,10 +233,10 @@ public sealed class PlaybackService : IPlaybackService
 		}
 
 		var isDifferentItem = CurrentItem?.JellyfinId != request.StartItem.JellyfinId;
-		if (_activeController is { } active && (active != controller || isDifferentItem))
+		if (_activeController is { } active && (active != controller || isDifferentItem || forceTransition))
 		{
-			_logger.LogInformation("Stopping active playback controller before switching. From={From}, To={To}, IsDifferentItem={IsDifferentItem}",
-				active.Kind, controller.Kind, isDifferentItem);
+			_logger.LogInformation("Stopping active playback controller before switching. From={From}, To={To}, IsDifferentItem={IsDifferentItem}, ForceTransition={ForceTransition}",
+				active.Kind, controller.Kind, isDifferentItem, forceTransition);
 			StopProgressLoop();
 			await ReportProgressAsync(cancellationToken);
 			await active.StopAsync(cancellationToken);
@@ -232,6 +251,10 @@ public sealed class PlaybackService : IPlaybackService
 		if (replaceQueue)
 		{
 			Queue.Replace(request.EffectiveQueue, request.StartIndex);
+		}
+		else if (Queue.CurrentIndex != request.StartIndex)
+		{
+			Queue.MoveTo(request.StartIndex);
 		}
 
 		_activeController = controller;
@@ -256,6 +279,31 @@ public sealed class PlaybackService : IPlaybackService
 			OnPlaybackChanged();
 			throw;
 		}
+	}
+
+	private async Task StopCoreAsync(PlaybackState? finalState, bool clearQueue, CancellationToken cancellationToken)
+	{
+		StopProgressLoop();
+		if (_activeController is { } controller)
+		{
+			await ReportProgressAsync(cancellationToken);
+			await controller.StopAsync(cancellationToken);
+		}
+
+		if (clearQueue)
+		{
+			Queue.Clear();
+		}
+
+		if (finalState is null || clearQueue)
+		{
+			_activeController = null;
+		}
+
+		_stateOverride = finalState;
+		DetachEngineEvents();
+		await _engineManager.DeactivateAsync(cancellationToken);
+		OnPlaybackChanged();
 	}
 
 	private void AttachEngineEvents(IMediaPlaybackEngine engine)
@@ -335,9 +383,31 @@ public sealed class PlaybackService : IPlaybackService
 			: Task.CompletedTask;
 	}
 
-	private void OnEngineStateChanged(object? sender, PlaybackStateChangedEventArgs e) => OnPlaybackChanged();
-	private void OnEnginePositionChanged(object? sender, PositionChangedEventArgs e) => OnPlaybackChanged();
-	private void OnEngineDurationChanged(object? sender, DurationChangedEventArgs e) => OnPlaybackChanged();
+	private void OnEngineStateChanged(object? sender, PlaybackStateChangedEventArgs e)
+	{
+		_lastPositionNotificationTicks = 0;
+		OnPlaybackChanged();
+	}
+
+	private void OnEnginePositionChanged(object? sender, PositionChangedEventArgs e)
+	{
+		var nowTicks = Environment.TickCount64;
+		if (nowTicks - Interlocked.Read(ref _lastPositionNotificationTicks) < PositionNotificationInterval.TotalMilliseconds &&
+			(e.Position - _lastNotifiedPosition).Duration() < TimeSpan.FromSeconds(1))
+		{
+			return;
+		}
+
+		_lastNotifiedPosition = e.Position;
+		Interlocked.Exchange(ref _lastPositionNotificationTicks, nowTicks);
+		OnPlaybackChanged();
+	}
+
+	private void OnEngineDurationChanged(object? sender, DurationChangedEventArgs e)
+	{
+		_lastPositionNotificationTicks = 0;
+		OnPlaybackChanged();
+	}
 
 	private void OnEngineMediaLoaded(object? sender, EventArgs e)
 	{
@@ -347,19 +417,47 @@ public sealed class PlaybackService : IPlaybackService
 
 	private async void OnEngineMediaEnded(object? sender, EventArgs e)
 	{
-		MediaEnded?.Invoke(this, EventArgs.Empty);
-		OnPlaybackChanged();
-
-		if (CurrentKind is PlaybackKind.Video && Queue.CanMoveNext)
+		if (_handlingMediaEnded)
 		{
+			return;
+		}
+
+		_handlingMediaEnded = true;
+		try
+		{
+			await _gate.WaitAsync();
 			try
 			{
-				await SkipNextAsync();
+				MediaEnded?.Invoke(this, EventArgs.Empty);
+				OnPlaybackChanged();
+
+				if (CurrentKind is not PlaybackKind.Video)
+				{
+					return;
+				}
+
+				if (Queue.CanMoveNext)
+				{
+					await PlayQueueIndexAsync(Queue.CurrentIndex + 1, CancellationToken.None);
+					return;
+				}
+
+				_logger.LogInformation("PlaybackService reached natural end of playback. Kind={Kind}, ItemId={ItemId}",
+					CurrentKind, CurrentItem?.JellyfinId);
+				await StopCoreAsync(finalState: PlaybackState.Ended, clearQueue: false, cancellationToken: CancellationToken.None);
 			}
-			catch (Exception ex)
+			finally
 			{
-				_logger.LogError(ex, "PlaybackService failed to advance video queue. ItemId={ItemId}", CurrentItem?.JellyfinId);
+				_gate.Release();
 			}
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "PlaybackService failed to finalize media end. ItemId={ItemId}", CurrentItem?.JellyfinId);
+		}
+		finally
+		{
+			_handlingMediaEnded = false;
 		}
 	}
 

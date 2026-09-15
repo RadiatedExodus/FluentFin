@@ -18,12 +18,14 @@ public sealed partial class MpvVideoView : UserControl
 		InitializeComponent();
 		_engine = App.GetService<MpvPlaybackEngine>();
 		_logger = App.GetService<ILogger<MpvVideoView>>();
-		_engine.VideoOutputChanged += OnVideoOutputChanged;
 		Loaded += OnLoaded;
 	}
 
 	private void OnLoaded(object sender, RoutedEventArgs e)
 	{
+		_engine.VideoOutputChanged -= OnVideoOutputChanged;
+		_engine.VideoOutputChanged += OnVideoOutputChanged;
+
 		if (_engine.VideoSwapChain != nint.Zero)
 		{
 			AttachCurrentSwapChain();

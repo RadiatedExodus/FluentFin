@@ -12,10 +12,12 @@ using FluentFin.Core.Services;
 using FluentFin.Core.ViewModels;
 using FluentFin.Core.WebSockets;
 using FluentFin.Core.WebSockets.Messages;
+using FluentFin.Dialogs.ViewModels;
 using FluentFin.Helpers;
 using FluentFin.Services;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml.Controls;
 using ReactiveUI;
 using AppSettings = FluentFin.Core.Settings.ISettings;
 using WpfKey = System.Windows.Input.Key;
@@ -28,6 +30,7 @@ public partial class VideoPlayerViewModel(
 	ILogger<VideoPlayerViewModel> logger,
 	IObservable<IInboundSocketMessage> webSocketMessages,
 	INavigationService navigationService,
+	IContentDialogService dialogService,
 	AppSettings settings,
 	ITaskBarProgress taskBarProgress,
 	IPlaybackService playbackService,
@@ -39,6 +42,8 @@ public partial class VideoPlayerViewModel(
 	private PlayQueueUpdate? _playQueueUpdate;
 	private SyncPlaySendCommand? _previousCommand;
 	private CancellationTokenSource? _playbackSelectionCts;
+	private CancellationTokenSource? _videoUiRefreshCts;
+	private Guid? _lastVideoUiItemId;
 	private bool _updatingPlaylistFromQueue;
 
 	public TrickplayViewModel TrickplayViewModel { get; } = trickplayViewModel;
@@ -54,7 +59,7 @@ public partial class VideoPlayerViewModel(
 	public partial PlaylistViewModel Playlist { get; set; } = new();
 
 	[ObservableProperty]
-	public partial MediaPlayerType MediaPlayerType { get; set; }
+	public partial MediaPlayerType? MediaPlayerType { get; set; }
 
 	[ObservableProperty]
 	public partial PlaybackState PlaybackState { get; set; } = PlaybackState.Stopped;
@@ -103,7 +108,12 @@ public partial class VideoPlayerViewModel(
 		_playbackSelectionCts?.Cancel();
 		_playbackSelectionCts?.Dispose();
 		_playbackSelectionCts = null;
-		return playbackService.StopAsync();
+		_videoUiRefreshCts?.Cancel();
+		_videoUiRefreshCts?.Dispose();
+		_videoUiRefreshCts = null;
+		return playbackService.CurrentKind is PlaybackKind.Video
+			? playbackService.StopAsync()
+			: Task.CompletedTask;
 	}
 
 	public async Task OnNavigatedTo(object parameter)
@@ -136,6 +146,7 @@ public partial class VideoPlayerViewModel(
 
 		Playlist.PropertyChanged += OnPlaylistPropertyChanged;
 		await TrickplayViewModel.Initialize();
+		RefreshTracks();
 
 		if (_playQueueUpdate is null)
 		{
@@ -212,8 +223,7 @@ public partial class VideoPlayerViewModel(
 
 		try
 		{
-			await LoadMediaSegments(full);
-			TrickplayViewModel.SetItem(full);
+			await RefreshCurrentVideoUiAsync(full, cancellationToken);
 			await playbackService.PlayAsync(CreatePlaybackRequest(selectedItem, full), cancellationToken);
 		}
 		catch (OperationCanceledException)
@@ -253,6 +263,46 @@ public partial class VideoPlayerViewModel(
 	{
 		var segments = await JellyfinClient.GetMediaSegments(dto, [MediaSegmentType.Intro, MediaSegmentType.Outro]);
 		Segments = segments?.Items ?? [];
+	}
+
+	private async Task RefreshCurrentVideoUiAsync(BaseItemDto item, CancellationToken cancellationToken)
+	{
+		if (item.Id is not { } id)
+		{
+			return;
+		}
+
+		_lastVideoUiItemId = id;
+		logger.LogInformation("Refreshing video UI metadata. ItemId={ItemId}", id);
+		await LoadMediaSegments(item);
+		cancellationToken.ThrowIfCancellationRequested();
+		TrickplayViewModel.SetItem(item);
+	}
+
+	private async Task RefreshCurrentVideoUiAsync(Guid itemId)
+	{
+		_videoUiRefreshCts?.Cancel();
+		_videoUiRefreshCts?.Dispose();
+		_videoUiRefreshCts = new CancellationTokenSource();
+		var cancellationToken = _videoUiRefreshCts.Token;
+
+		try
+		{
+			var full = await JellyfinClient.GetItem(itemId);
+			cancellationToken.ThrowIfCancellationRequested();
+			if (full is not null)
+			{
+				await RefreshCurrentVideoUiAsync(full, cancellationToken);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+			logger.LogDebug("Video UI metadata refresh was canceled. ItemId={ItemId}", itemId);
+		}
+		catch (Exception ex)
+		{
+			logger.LogWarning(ex, "Video UI metadata refresh failed. ItemId={ItemId}", itemId);
+		}
 	}
 
 	[RelayCommand]
@@ -325,6 +375,35 @@ public partial class VideoPlayerViewModel(
 	}
 
 	[RelayCommand]
+	private async Task Cast()
+	{
+		if (Playlist.SelectedItem?.Dto is not { } dto)
+		{
+			return;
+		}
+
+		var vm = App.GetService<SessionPickerViewModel>();
+		await vm.Initialize(dto);
+		var result = await dialogService.ShowDialog(vm, dialog =>
+		{
+			dialog.Closing += (_, e) =>
+			{
+				if (!vm.CanClose)
+				{
+					e.Cancel = true;
+				}
+			};
+			dialog.CloseButtonClick += (_, _) => { vm.CanClose = true; };
+			dialog.PrimaryButtonClick += (_, _) => { vm.CanClose = true; };
+		});
+
+		if (result is ContentDialogResult.Primary && playbackService.CurrentKind is PlaybackKind.Video)
+		{
+			await playbackService.StopAsync();
+		}
+	}
+
+	[RelayCommand]
 	private void ToggleFullscreen()
 	{
 		ToggleFullScreen?.Invoke();
@@ -353,6 +432,10 @@ public partial class VideoPlayerViewModel(
 			{
 				var item = playbackService.CurrentItem;
 				Playlist.SelectedItem = item is null ? null : Playlist.Items.FirstOrDefault(x => x.Dto.Id == item.JellyfinId);
+				if (item is { JellyfinId: var itemId } && itemId != _lastVideoUiItemId)
+				{
+					_ = RefreshCurrentVideoUiAsync(itemId);
+				}
 			}
 			finally
 			{
@@ -412,7 +495,6 @@ public partial class VideoPlayerViewModel(
 			taskBarProgress.Clear();
 		}
 
-		RefreshTracks();
 	}
 
 	private void RefreshTracks()

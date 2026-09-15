@@ -23,6 +23,8 @@ public sealed class WindowsMediaSessionService(
 	private PlaybackState? _lastTimelineState;
 	private DateTimeOffset _lastTimelineUpdate = DateTimeOffset.MinValue;
 	private int _metadataVersion;
+	private int _updateQueued;
+	private bool _queuedForceTimeline;
 	private bool _initialized;
 	private bool _disposed;
 
@@ -117,8 +119,26 @@ public sealed class WindowsMediaSessionService(
 			return;
 		}
 
-		if (!App.MainWindow.DispatcherQueue.TryEnqueue(() => UpdateNowPlaying(forceTimeline)))
+		if (forceTimeline)
 		{
+			_queuedForceTimeline = true;
+		}
+
+		if (Interlocked.Exchange(ref _updateQueued, 1) == 1)
+		{
+			return;
+		}
+
+		if (!App.MainWindow.DispatcherQueue.TryEnqueue(() =>
+		{
+			var shouldForceTimeline = _queuedForceTimeline;
+			_queuedForceTimeline = false;
+			Interlocked.Exchange(ref _updateQueued, 0);
+			UpdateNowPlaying(shouldForceTimeline);
+		}))
+		{
+			_queuedForceTimeline = false;
+			Interlocked.Exchange(ref _updateQueued, 0);
 			logger.LogWarning("Windows media session update could not be queued to the UI thread");
 		}
 	}
