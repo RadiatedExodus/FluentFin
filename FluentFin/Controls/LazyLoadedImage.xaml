@@ -15,8 +15,18 @@
             Source="{x:Bind BlurHashImageSource, Mode=OneWay}"
             Stretch="{x:Bind Stretch, Mode=OneWay}"
             Visibility="{x:Bind EnableBlurHash, Converter={StaticResource BooleanToVisibilityConverter}, Mode=OneWay}" />
+        <Grid
+            x:Name="FailedTemplate"
+            Padding="20"
+            Background="DarkGray"
+            Visibility="Collapsed">
+            <Viewbox>
+                <FontIcon Glyph="{x:Bind Glyph, Mode=OneWay}" />
+            </Viewbox>
+        </Grid>
         <Image
             Name="Image"
+            ImageFailed="ImageFailed"
             ImageOpened="ImageOpened"
             Opacity="0"
             Source="{x:Bind ImageSource, Mode=OneWay}"

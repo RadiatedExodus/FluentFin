@@ -53,7 +53,7 @@
                                             Width="390"
                                             Height="240"
                                             BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(Dto, jm:ImageType.Thumb, 192)}"
-                                            ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(Dto, jm:ImageType.Thumb, 192)}"
+                                            ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(Dto, jm:ImageType.Thumb, 192)}"
                                             JellyfinClient="{Binding ElementName=Page, Path=ViewModel.JellyfinClient}"
                                             Model="{x:Bind}" />
                                     </DataTemplate>
@@ -83,7 +83,7 @@
                                             Width="390"
                                             Height="240"
                                             BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(Dto, jm:ImageType.Thumb, 192)}"
-                                            ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(Dto, jm:ImageType.Thumb, 192)}"
+                                            ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(Dto, jm:ImageType.Thumb, 192)}"
                                             JellyfinClient="{Binding ElementName=Page, Path=ViewModel.JellyfinClient}"
                                             Model="{x:Bind}" />
                                     </DataTemplate>

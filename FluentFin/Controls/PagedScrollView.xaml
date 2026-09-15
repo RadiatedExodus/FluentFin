@@ -75,7 +75,7 @@
                                 Width="225"
                                 Height="385"
                                 BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(Dto, jm:ImageType.Thumb, 302)}"
-                                ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(Dto, jm:ImageType.Primary, 302)}"
+                                ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(Dto, jm:ImageType.Primary, 302)}"
                                 JellyfinClient="{Binding ElementName=Page, Path=JellyfinClient}"
                                 Model="{x:Bind}" />
                         </DataTemplate>

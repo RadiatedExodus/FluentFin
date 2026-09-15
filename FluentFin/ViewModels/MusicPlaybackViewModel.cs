@@ -128,6 +128,9 @@ public partial class MusicPlaybackViewModel : ObservableObject
 	public ImageSource? Artwork => CurrentItem is null
 		? null
 		: FluentFin.Converters.BaseItemDtoConverters.GetImage(CurrentItem.Item, ImageType.Primary, 600);
+	public Uri? ArtworkUri => CurrentItem is null
+		? null
+		: FluentFin.Converters.BaseItemDtoConverters.GetImageUri(CurrentItem.Item, ImageType.Primary, 600);
 
 	partial void OnVolumePercentChanged(int value)
 	{
@@ -328,6 +331,7 @@ public partial class MusicPlaybackViewModel : ObservableObject
 		OnPropertyChanged(nameof(RepeatGlyph));
 		OnPropertyChanged(nameof(RepeatToolTip));
 		OnPropertyChanged(nameof(Artwork));
+		OnPropertyChanged(nameof(ArtworkUri));
 		OnPropertyChanged(nameof(VolumePercentValue));
 	}
 

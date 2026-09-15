@@ -155,7 +155,7 @@
                                 <ItemContainer CornerRadius="{StaticResource ControlCornerRadius}" Style="{StaticResource BareItemContainerStyle}">
                                     <lc:BaseItemDtoCard
                                         BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(Dto, jm:ImageType.Primary, 352)}"
-                                        ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(Dto, jm:ImageType.Primary, 352)}"
+                                        ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(Dto, jm:ImageType.Primary, 352)}"
                                         JellyfinClient="{Binding ElementName=Page, Path=ViewModel.JellyfinClient}"
                                         Model="{x:Bind}" />
                                 </ItemContainer>

@@ -119,7 +119,7 @@
                                         <lc:LazyLoadedImage
                                             Height="90"
                                             BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
-                                            ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
+                                            ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
                                             Stretch="UniformToFill" />
                                     </Grid>
                                     <StackPanel Grid.Column="1">

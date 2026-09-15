@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:c="using:FluentFin.Converters"
+    xmlns:controls="using:FluentFin.Controls"
     xmlns:ctkl="using:CommunityToolkit.Labs.WinUI"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:jm="using:Jellyfin.Sdk.Generated.Models"
@@ -23,8 +24,10 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Width="220" Height="220">
-                    <Image
-                        Source="{x:Bind c:BaseItemDtoConverters.GetImage(ViewModel.Album, jm:ImageType.Primary, 440), Mode=OneWay}"
+                    <controls:LazyLoadedImage
+                        BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(ViewModel.Album, jm:ImageType.Primary, 440), Mode=OneWay}"
+                        EnableBlurHash="True"
+                        ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(ViewModel.Album, jm:ImageType.Primary, 440), Mode=OneWay}"
                         Stretch="UniformToFill" />
                     <Button
                         Width="64"

@@ -114,6 +114,8 @@ public partial class App : Application
 			services.AddSingleton<ITaskBarProgress, TaskBarProgress>();
 			services.AddSingleton<IBandwidthMeasurementCache, BandwidthMeasurementCache>();
 			services.AddSingleton<IImageSourceCache, ImageSourceCache>();
+			services.AddSingleton<IClientImageCacheMaintenance>(sp => (ImageSourceCache)sp.GetRequiredService<IImageSourceCache>());
+			services.AddSingleton<IJellyfinImageUriProvider, JellyfinImageUriProvider>();
 			services.AddSingleton<IBlurHashCache, BlurHashCache>();
 			services.AddSingleton<IWindowsMediaSessionService, WindowsMediaSessionService>();
 			services.AddSingleton<IPlaybackEngineManager, PlaybackEngineManager>();

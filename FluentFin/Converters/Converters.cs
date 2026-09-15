@@ -2,6 +2,7 @@
 using System.Web;
 using CommunityToolkit.Mvvm.Input;
 using DynamicData;
+using FluentFin.Contracts.Services;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.ViewModels;
 using Flurl;
@@ -87,7 +88,7 @@ public static class Converters
 
 		try
 		{
-			return new BitmapImage(uri);
+			return App.GetService<IImageSourceCache>().Get(uri);
 		}
 		catch 
 		{
@@ -104,7 +105,7 @@ public static class Converters
 
 		try
 		{
-			return new BitmapImage(new Uri(uri));
+			return App.GetService<IImageSourceCache>().Get(new Uri(uri));
 		}
 		catch
 		{

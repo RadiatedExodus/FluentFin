@@ -17,6 +17,7 @@ public static class BaseItemDtoConverters
 {
 	private static IImageSourceCache ImageCache => App.GetService<IImageSourceCache>();
 	private static IBlurHashCache BlurHashCache => App.GetService<IBlurHashCache>();
+	private static IJellyfinImageUriProvider ImageUriProvider => App.GetService<IJellyfinImageUriProvider>();
 
 	public static string GetCardTitle(this BaseItemDto? dto)
 	{
@@ -104,13 +105,19 @@ public static class BaseItemDtoConverters
 
 	public static BitmapImage? GetImage(BaseItemPerson personDto, double height)
 	{
-		return ImageCache.Get(SessionInfo.BaseUrl.AppendPathSegment($"/Items/{personDto.Id}/Images/Primary").SetQueryParam("fillHeight", height).ToUri());
+		var uri = GetImageUri(personDto, height);
+		return uri is null ? null : ImageCache.Get(uri);
 	}
 
 	public static BitmapImage? GetImage(VirtualFolderInfo folderInfo)
 	{
-		return ImageCache.Get(SessionInfo.BaseUrl.AppendPathSegment($"/Items/{folderInfo.ItemId}/Images/Primary").ToUri());
+		var uri = GetImageUri(folderInfo);
+		return uri is null ? null : ImageCache.Get(uri);
 	}
+
+	public static Uri? GetImageUri(BaseItemPerson personDto, double height) => ImageUriProvider.GetImageUri(personDto, height);
+
+	public static Uri? GetImageUri(VirtualFolderInfo folderInfo) => ImageUriProvider.GetImageUri(folderInfo);
 
 
 	public static WriteableBitmap? GetBlurHash(BaseItemDto? dto, ImageType imageType, double height)
@@ -120,85 +127,11 @@ public static class BaseItemDtoConverters
 
 	public static BitmapImage? GetImage(BaseItemDto? dto, ImageType imageType, double height)
 	{
-		if (dto is null)
-		{
-			return null;
-		}
-
-		if (dto.Id is not { } id)
-		{
-			return null;
-		}
-
-		if (dto.ImageTags is null)
-		{
-			return null;
-		}
-
-		var hasRequestTag = dto.ImageTags.AdditionalData.TryGetValue($"{imageType}", out object? requestTag);
-		var backdropTag = dto.BackdropImageTags?.FirstOrDefault();
-		var parentBackdropTag = dto.ParentBackdropImageTags?.FirstOrDefault();
-
-		var tag = "";
-		if (hasRequestTag == true)
-		{
-			tag = $"{requestTag}";
-		}
-		else if (!string.IsNullOrEmpty(backdropTag))
-		{
-			tag = $"{backdropTag}";
-		}
-		else if (!string.IsNullOrEmpty(parentBackdropTag))
-		{
-			tag = $"{parentBackdropTag}";
-		}
-
-		if (imageType == ImageType.Backdrop && dto.Type is BaseItemDto_Type.Season or BaseItemDto_Type.Episode && dto.SeriesId is { } pid)
-		{
-			id = pid;
-		}
-
-		if (imageType == ImageType.Thumb && !hasRequestTag)
-		{
-			imageType = ImageType.Primary;
-			if (dto.ImageTags.AdditionalData.TryGetValue($"{ImageType.Primary}", out var primaryTag))
-			{
-				tag = $"{primaryTag}";
-			}
-		}
-
-		else if (imageType == ImageType.Primary && dto.Type == BaseItemDto_Type.Episode)
-		{
-			if (!string.IsNullOrEmpty(dto.SeriesPrimaryImageTag) && dto.SeriesId is { } seriesId)
-			{
-				id = seriesId;
-				tag = $"{dto.SeriesPrimaryImageTag}";
-			}
-		}
-		else if (imageType == ImageType.Logo && dto.Type == BaseItemDto_Type.Episode)
-		{
-			if (!string.IsNullOrEmpty(dto.SeriesPrimaryImageTag) && dto.SeriesId is { } seriesId)
-			{
-				id = seriesId;
-				tag = $"{dto.ParentLogoImageTag}";
-			}
-		}
-
-		var uri = SessionInfo.BaseUrl.AppendPathSegment($"/Items/{id}/Images/{imageType}");
-
-		if (height is { } h)
-		{
-			uri.SetQueryParam("fillHeight", h);
-		}
-
-		if (!string.IsNullOrEmpty(tag))
-		{
-			uri.SetQueryParam("tag", tag);
-		}
-
-
-		return ImageCache.Get(uri.ToUri());
+		var uri = GetImageUri(dto, imageType, height);
+		return uri is null ? null : ImageCache.Get(uri);
 	}
+
+	public static Uri? GetImageUri(BaseItemDto? dto, ImageType imageType, double height) => ImageUriProvider.GetImageUri(dto, imageType, height);
 
 	public static int GetCardBadgeValue(BaseItemViewModel vm)
 	{

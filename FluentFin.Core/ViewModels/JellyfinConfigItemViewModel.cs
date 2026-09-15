@@ -83,6 +83,17 @@ public partial class JellyfinSelectableConfigItemViewModel : JellyfinConfigItemV
 
 public class JellyfinTextBlockConfigItemViewModel(Func<string> getValue, Action<string> setValue) : JellyfinConfigItemViewModel<string>(getValue, setValue) { }
 
+public class JellyfinActionConfigItemViewModel(Func<Task> execute) : JellyfinConfigItemViewModel
+{
+	public string ButtonText { get; set; } = "";
+
+	public async Task ExecuteAsync() => await execute();
+
+	public override void Save() { }
+
+	public override void Reset() { }
+}
+
 public class JellyfinGroupedConfigItemViewModel : JellyfinConfigItemViewModel
 {
 	public List<JellyfinConfigItemViewModel> Items { get; set; } = [];

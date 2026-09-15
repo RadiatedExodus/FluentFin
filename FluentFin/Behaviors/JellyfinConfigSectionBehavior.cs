@@ -43,6 +43,7 @@ public partial class JellyfinConfigSectionBehavior : Behavior<StackPanel>
 	{
 		return model switch
 		{
+			JellyfinActionConfigItemViewModel action => CreateActionButton(action),
 			JellyfinTextBlockConfigItemViewModel str => CreateTextBlock(str),
 			JellyfinSelectableConfigItemViewModel cb => CreateComboBox(cb),
 			JellyfinGroupedConfigItemViewModel group => CreateGroup(group),
@@ -51,6 +52,16 @@ public partial class JellyfinConfigSectionBehavior : Behavior<StackPanel>
 			JellyfinConfigItemViewModel<string> str => CreateTextBox(str),
 			_ => throw new NotImplementedException()
 		};
+	}
+
+	private static SettingsCard CreateActionButton(JellyfinActionConfigItemViewModel model)
+	{
+		var button = new Button
+		{
+			Content = string.IsNullOrWhiteSpace(model.ButtonText) ? model.DisplayName : model.ButtonText
+		};
+		button.Click += async (_, _) => await model.ExecuteAsync();
+		return CreateSettingsCard(button, model);
 	}
 
 	private static SettingsExpander CreateGroup(JellyfinGroupedConfigItemViewModel model)

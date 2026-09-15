@@ -43,7 +43,7 @@
             <controls:LazyLoadedImage
                 BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(Model.Dto, jm:ImageType.Primary, ArtworkSize), Mode=OneWay}"
                 EnableBlurHash="True"
-                ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(Model.Dto, jm:ImageType.Primary, ArtworkSize), Mode=OneWay}" />
+                ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(Model.Dto, jm:ImageType.Primary, ArtworkSize), Mode=OneWay}" />
 
             <Button
                 Width="48"

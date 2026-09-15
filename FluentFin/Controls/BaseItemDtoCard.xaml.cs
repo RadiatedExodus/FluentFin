@@ -15,6 +15,9 @@ public sealed partial class BaseItemDtoCard : UserControl
 	public partial ImageSource? ImageSource { get; set; }
 
 	[GeneratedDependencyProperty]
+	public partial Uri? ImageUri { get; set; }
+
+	[GeneratedDependencyProperty]
 	public partial BaseItemViewModel? Model { get; set; }
 
 	[GeneratedDependencyProperty]

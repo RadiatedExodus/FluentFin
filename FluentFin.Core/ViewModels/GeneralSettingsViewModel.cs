@@ -3,7 +3,7 @@ using Jellyfin.Sdk.Generated.Models;
 
 namespace FluentFin.Core.ViewModels;
 
-public partial class GeneralSettingsViewModel(IJellyfinClient jellyfinClient) : ServerConfigurationViewModel(jellyfinClient)
+public partial class GeneralSettingsViewModel(IJellyfinClient jellyfinClient, IClientImageCacheMaintenance imageCache) : ServerConfigurationViewModel(jellyfinClient)
 {
 	protected override List<JellyfinConfigItemViewModel> CreateItems(ServerConfiguration config)
 	{
@@ -52,7 +52,63 @@ public partial class GeneralSettingsViewModel(IJellyfinClient jellyfinClient) : 
 						Description = "Maximum number of image encodings that are allowed to run in parallel. Setting this to 0 will choose a limit based on your systems core count."
 					}
 				]
+			},
+			new JellyfinGroupedConfigItemViewModel()
+			{
+				DisplayName = "Client Cache",
+				Description = "Local FluentFin cache files used to speed up artwork loading.",
+				Items =
+				[
+					new JellyfinTextBlockConfigItemViewModel(GetImageCacheSummary, _ => { })
+					{
+						DisplayName = "Image cache",
+						Description = "Artwork stored locally on this device."
+					},
+					new JellyfinActionConfigItemViewModel(ClearImageCache)
+					{
+						DisplayName = "Clear image cache",
+						Description = "Remove locally cached artwork. Images will redownload when needed.",
+						ButtonText = "Clear"
+					}
+				]
 			}
 		];
+	}
+
+	private string GetImageCacheSummary()
+	{
+		try
+		{
+			var stats = imageCache.GetStatsAsync().GetAwaiter().GetResult();
+			return $"{stats.FileCount} files, {FormatBytes(stats.SizeBytes)}";
+		}
+		catch
+		{
+			return "Unavailable";
+		}
+	}
+
+	private async Task ClearImageCache()
+	{
+		await imageCache.ClearAsync();
+		var configuration = await _jellyfinClient.GetConfiguration();
+		if (configuration is not null)
+		{
+			Items = CreateItems(configuration);
+		}
+	}
+
+	private static string FormatBytes(long bytes)
+	{
+		string[] units = ["B", "KB", "MB", "GB"];
+		double value = bytes;
+		var unit = 0;
+		while (value >= 1024 && unit < units.Length - 1)
+		{
+			value /= 1024;
+			unit++;
+		}
+
+		return $"{value:0.#} {units[unit]}";
 	}
 }

@@ -97,6 +97,7 @@
                 <controls:LazyLoadedImage
                     BlurHashImageSource="{x:Bind BlurHashImageSource}"
                     EnableBlurHash="True"
+                    ImageUri="{x:Bind ImageUri, Mode=OneWay}"
                     ImageSource="{x:Bind ImageSource}" />
 
                 <media:UIElementExtensions.VisualFactory>

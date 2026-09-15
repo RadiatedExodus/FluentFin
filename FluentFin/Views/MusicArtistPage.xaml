@@ -27,7 +27,7 @@
                     <controls:LazyLoadedImage
                         BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash(ViewModel.Artist, jm:ImageType.Primary, 440), Mode=OneWay}"
                         EnableBlurHash="True"
-                        ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage(ViewModel.Artist, jm:ImageType.Primary, 440), Mode=OneWay}" />
+                        ImageUri="{x:Bind c:BaseItemDtoConverters.GetImageUri(ViewModel.Artist, jm:ImageType.Primary, 440), Mode=OneWay}" />
                 </Grid>
 
                 <StackPanel
