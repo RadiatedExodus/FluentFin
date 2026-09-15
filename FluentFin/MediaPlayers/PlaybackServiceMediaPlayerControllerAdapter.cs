@@ -179,12 +179,6 @@ public sealed class PlaybackServiceMediaPlayerControllerAdapter : IMediaPlayerCo
 			case PlaybackState.Stopped:
 				_stopped.OnNext(Unit.Default);
 				break;
-			case PlaybackState.Ended:
-				_ended.OnNext(Unit.Default);
-				break;
-			case PlaybackState.Error:
-				_errored.OnNext(Unit.Default);
-				break;
 		}
 	}
 

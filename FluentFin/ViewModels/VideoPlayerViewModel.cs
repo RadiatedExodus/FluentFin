@@ -387,19 +387,27 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 
 	private void SubscribeEvents(IMediaPlayerController mp)
 	{
-		mp.Ended.Where(_ => Playlist.CanSelectNext).Subscribe(_ =>
-		{
-			taskBarProgress.Clear();
-			Playlist.SelectNext();
-		}).DisposeWith(_disposables);
-		mp.Stopped.Subscribe(async _ =>
+		mp.Ended
+			.Where(_ => Playlist.CanSelectNext)
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(_ =>
+			{
+				taskBarProgress.Clear();
+				Playlist.SelectNext();
+			})
+			.DisposeWith(_disposables);
+		mp.Stopped
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(async _ =>
 		{
 			if (!_suppressLegacyStopReporting)
 			{
 				await JellyfinClient.Stop();
 			}
 		}).DisposeWith(_disposables);
-		mp.Errored.Subscribe(async _ =>
+		mp.Errored
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(async _ =>
 		{
 			logger.LogError("An error occurred while playing media");
 			await JellyfinClient.Stop();
@@ -412,7 +420,10 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 			.ObserveOn(RxApp.MainThreadScheduler)
 			.Subscribe(isVisible => IsSkipButtonVisible = isVisible)
 			.DisposeWith(_disposables);
-		mp.DurationChanged.Subscribe(d => _duration = d).DisposeWith(_disposables);
+		mp.DurationChanged
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(d => _duration = d)
+			.DisposeWith(_disposables);
 
 		mp.MediaLoaded
 		  .Where(_ => _playQueueUpdate is not null)

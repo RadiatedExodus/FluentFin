@@ -146,14 +146,14 @@ public sealed class MpvPlaybackEngine(
 		{
 			_pendingSeekAfterLoad = position;
 			_position = position;
-			RaiseOnUi(() => PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position)));
+			PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position));
 			logger.LogInformation("mpv seek deferred until media is loaded. Position={Position}", position);
 			return;
 		}
 
 		await mpv.SeekAsync(position, cancellationToken);
 		_position = position;
-		RaiseOnUi(() => PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position)));
+		PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position));
 	}
 
 	public void OpenExternalSubtitleTrack(string url)
@@ -246,7 +246,7 @@ public sealed class MpvPlaybackEngine(
 		_disposed = true;
 		logger.LogInformation("mpv playback engine disposing");
 		VideoSwapChain = nint.Zero;
-		RaiseOnUi(() => VideoOutputChanged?.Invoke(this, EventArgs.Empty));
+		VideoOutputChanged?.Invoke(this, EventArgs.Empty);
 		if (_mpv is not null)
 		{
 			await _mpv.DisposeAsync();
@@ -296,21 +296,38 @@ public sealed class MpvPlaybackEngine(
 
 		RefreshVideoSwapChain("file-loaded");
 		StartSwapChainPolling();
-		RaiseOnUi(() => MediaLoaded?.Invoke(this, EventArgs.Empty));
+		MediaLoaded?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void OnMpvEndFile(object? sender, MpvEndFileEventArgs e)
 	{
 		logger.LogInformation("mpv media ended. Reason={Reason}, ErrorCode={ErrorCode}", e.Reason, e.ErrorCode);
-		if (string.Equals(e.Reason, "Error", StringComparison.OrdinalIgnoreCase))
+		switch (e.Reason)
 		{
-			SetState(PlaybackState.Error);
-			RaiseOnUi(() => PlaybackFailed?.Invoke(this, new PlaybackErrorEventArgs(null, $"mpv ended with error code {e.ErrorCode}.")));
-			return;
-		}
+			case MpvEndFileReason.Eof:
+				SetState(PlaybackState.Ended);
+				MediaEnded?.Invoke(this, EventArgs.Empty);
+				break;
 
-		SetState(PlaybackState.Ended);
-		RaiseOnUi(() => MediaEnded?.Invoke(this, EventArgs.Empty));
+			case MpvEndFileReason.Error:
+				SetState(PlaybackState.Error);
+				PlaybackFailed?.Invoke(this, new PlaybackErrorEventArgs(null, $"mpv ended with error code {e.ErrorCode}."));
+				break;
+
+			case MpvEndFileReason.Stop:
+			case MpvEndFileReason.Quit:
+				SetState(PlaybackState.Stopped);
+				break;
+
+			case MpvEndFileReason.Redirect:
+				logger.LogDebug("mpv end-file redirect ignored for playback completion");
+				break;
+
+			default:
+				logger.LogWarning("mpv ended with unknown end-file reason. Reason={Reason}, ErrorCode={ErrorCode}", e.Reason, e.ErrorCode);
+				SetState(PlaybackState.Stopped);
+				break;
+		}
 	}
 
 	private void OnMpvPropertyChanged(object? sender, MpvPropertyChangedEventArgs e)
@@ -322,16 +339,16 @@ public sealed class MpvPlaybackEngine(
 				break;
 			case "time-pos" when e.Value is double seconds:
 				_position = TimeSpan.FromSeconds(Math.Max(0, seconds));
-				RaiseOnUi(() => PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position)));
+				PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position));
 				break;
 			case "duration" when e.Value is double seconds:
 				_duration = TimeSpan.FromSeconds(Math.Max(0, seconds));
-				RaiseOnUi(() => DurationChanged?.Invoke(this, new DurationChangedEventArgs(_duration)));
+				DurationChanged?.Invoke(this, new DurationChangedEventArgs(_duration));
 				break;
 			case "display-swapchain" when e.Value is long swapChain:
 				VideoSwapChain = (nint)swapChain;
 				logger.LogInformation("mpv video output changed. HasSwapChain={HasSwapChain}", VideoSwapChain != nint.Zero);
-				RaiseOnUi(() => VideoOutputChanged?.Invoke(this, EventArgs.Empty));
+				VideoOutputChanged?.Invoke(this, EventArgs.Empty);
 				break;
 			case "track-list":
 				logger.LogDebug("mpv track list changed. TrackCount={TrackCount}", _mpv?.GetTracks().Count ?? 0);
@@ -362,7 +379,7 @@ public sealed class MpvPlaybackEngine(
 
 		_state = state;
 		logger.LogDebug("mpv playback state changed. State={State}", state);
-		RaiseOnUi(() => StateChanged?.Invoke(this, new PlaybackStateChangedEventArgs(state)));
+		StateChanged?.Invoke(this, new PlaybackStateChangedEventArgs(state));
 	}
 
 	private void ApplyKnownVideoOutputSize()
@@ -392,7 +409,7 @@ public sealed class MpvPlaybackEngine(
 		}
 
 		VideoSwapChain = swapChain;
-		RaiseOnUi(() => VideoOutputChanged?.Invoke(this, EventArgs.Empty));
+		VideoOutputChanged?.Invoke(this, EventArgs.Empty);
 	}
 
 	private void StartSwapChainPolling()
@@ -425,48 +442,11 @@ public sealed class MpvPlaybackEngine(
 			logger.LogInformation("mpv deferred seek requested. Position={Position}", position);
 			await _mpv.SeekAsync(position);
 			_position = position;
-			RaiseOnUi(() => PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position)));
+			PositionChanged?.Invoke(this, new PositionChangedEventArgs(_position));
 		}
 		catch (Exception ex)
 		{
 			logger.LogWarning(ex, "mpv deferred seek failed. Position={Position}", position);
-		}
-	}
-
-	private void RaiseOnUi(Action action)
-	{
-		if (_disposed)
-		{
-			return;
-		}
-
-		try
-		{
-			var dispatcher = App.MainWindow.DispatcherQueue;
-			if (dispatcher.HasThreadAccess)
-			{
-				action();
-				return;
-			}
-
-			if (!dispatcher.TryEnqueue(() =>
-			{
-				try
-				{
-					action();
-				}
-				catch (Exception ex)
-				{
-					logger.LogWarning(ex, "mpv UI event dispatch failed");
-				}
-			}))
-			{
-				logger.LogWarning("mpv UI event dispatch could not be queued");
-			}
-		}
-		catch (Exception ex)
-		{
-			logger.LogWarning(ex, "mpv UI event dispatch failed before queueing");
 		}
 	}
 

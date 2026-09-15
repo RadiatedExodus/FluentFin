@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Concurrent;
 using FluentFin.Mpv.Interop;
 
 namespace FluentFin.Mpv;
@@ -8,8 +9,10 @@ public sealed class MpvClient : IAsyncDisposable
 {
 	private readonly MpvOptions _options;
 	private readonly CancellationTokenSource _eventLoopCts = new();
+	private readonly ConcurrentDictionary<ulong, PendingCommand> _pendingCommands = [];
 	private SafeMpvHandle? _handle;
 	private Task? _eventLoopTask;
+	private long _nextReplyUserData = 1000;
 	private bool _initialized;
 
 	public MpvClient(MpvOptions? options = null)
@@ -88,6 +91,21 @@ public sealed class MpvClient : IAsyncDisposable
 	{
 		cancellationToken.ThrowIfCancellationRequested();
 		ThrowIfNotInitialized();
+		var replyUserData = (ulong)Interlocked.Increment(ref _nextReplyUserData);
+		var operation = arguments.FirstOrDefault() ?? "command";
+		var pending = new PendingCommand(operation);
+		_pendingCommands[replyUserData] = pending;
+		if (cancellationToken.CanBeCanceled)
+		{
+			pending.CancellationRegistration = cancellationToken.Register(() =>
+			{
+				if (_pendingCommands.TryRemove(replyUserData, out var command))
+				{
+					command.Cancel();
+				}
+			});
+		}
+
 		unsafe
 		{
 			var utf8 = arguments.Select(arg => Encoding.UTF8.GetBytes(arg + "\0")).ToArray();
@@ -102,7 +120,11 @@ public sealed class MpvClient : IAsyncDisposable
 
 				fixed (nint* ptr = pointers)
 				{
-					Check(MpvNative.Command(_handle!.DangerousGetHandle(), (nint)ptr), $"execute mpv command {arguments.FirstOrDefault()}");
+					var result = MpvNative.CommandAsync(_handle!.DangerousGetHandle(), replyUserData, (nint)ptr);
+					if (result < 0 && _pendingCommands.TryRemove(replyUserData, out var failedCommand))
+					{
+						failedCommand.Fail(new MpvException(result, $"Unable to queue mpv command {operation}: {MpvNative.ErrorString(result)}"));
+					}
 				}
 			}
 			finally
@@ -114,7 +136,7 @@ public sealed class MpvClient : IAsyncDisposable
 			}
 		}
 
-		return Task.CompletedTask;
+		return pending.Task;
 	}
 
 	public IReadOnlyList<MpvTrack> GetTracks()
@@ -257,6 +279,12 @@ public sealed class MpvClient : IAsyncDisposable
 
 		_handle?.Dispose();
 		_eventLoopCts.Dispose();
+		foreach (var (_, pending) in _pendingCommands.ToArray())
+		{
+			pending.Cancel();
+		}
+
+		_pendingCommands.Clear();
 	}
 
 	private void Observe(string name, MpvFormat format, ulong id)
@@ -279,12 +307,15 @@ public sealed class MpvClient : IAsyncDisposable
 			{
 				case MpvEventId.None:
 					break;
+				case MpvEventId.CommandReply:
+					HandleCommandReply(mpvEvent);
+					break;
 				case MpvEventId.FileLoaded:
 					FileLoaded?.Invoke(this, EventArgs.Empty);
 					break;
 				case MpvEventId.EndFile:
 					var end = Marshal.PtrToStructure<MpvEventEndFile>(mpvEvent.Data);
-					EndFile?.Invoke(this, new MpvEndFileEventArgs(end.Reason.ToString(), end.Error));
+					EndFile?.Invoke(this, new MpvEndFileEventArgs(end.Reason, end.Error));
 					break;
 				case MpvEventId.PropertyChange:
 					HandlePropertyChange(mpvEvent.Data);
@@ -296,7 +327,35 @@ public sealed class MpvClient : IAsyncDisposable
 					PlaybackRestarted?.Invoke(this, EventArgs.Empty);
 					break;
 				case MpvEventId.Shutdown:
+					CancelPendingCommands();
 					return;
+			}
+		}
+	}
+
+	private void HandleCommandReply(MpvEvent mpvEvent)
+	{
+		if (!_pendingCommands.TryRemove(mpvEvent.ReplyUserData, out var pending))
+		{
+			return;
+		}
+
+		if (mpvEvent.Error < 0)
+		{
+			pending.Fail(new MpvException(mpvEvent.Error, $"Unable to execute mpv command {pending.Operation}: {MpvNative.ErrorString(mpvEvent.Error)}"));
+			return;
+		}
+
+		pending.Complete();
+	}
+
+	private void CancelPendingCommands()
+	{
+		foreach (var (key, pending) in _pendingCommands.ToArray())
+		{
+			if (_pendingCommands.TryRemove(key, out _))
+			{
+				pending.Cancel();
 			}
 		}
 	}
@@ -353,6 +412,33 @@ public sealed class MpvClient : IAsyncDisposable
 		if (error < 0)
 		{
 			throw new MpvException(error, $"Unable to {operation}: {MpvNative.ErrorString(error)}");
+		}
+	}
+
+	private sealed class PendingCommand(string operation)
+	{
+		private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+		public string Operation { get; } = operation;
+		public CancellationTokenRegistration CancellationRegistration { get; set; }
+		public Task Task => _completion.Task;
+
+		public void Complete()
+		{
+			CancellationRegistration.Dispose();
+			_completion.TrySetResult();
+		}
+
+		public void Fail(Exception exception)
+		{
+			CancellationRegistration.Dispose();
+			_completion.TrySetException(exception);
+		}
+
+		public void Cancel()
+		{
+			CancellationRegistration.Dispose();
+			_completion.TrySetCanceled();
 		}
 	}
 }

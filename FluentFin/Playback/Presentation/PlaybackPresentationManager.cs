@@ -16,8 +16,8 @@ public partial class PlaybackPresentationManager : ObservableObject, IPlaybackPr
 	{
 		_playbackService = playbackService;
 		_logger = logger;
-		_playbackService.PlaybackChanged += (_, _) => SyncMusicPresentationFromPlayback();
-		_playbackService.QueueChanged += (_, _) => SyncMusicPresentationFromPlayback();
+		_playbackService.PlaybackChanged += (_, _) => EnqueueSyncMusicPresentationFromPlayback();
+		_playbackService.QueueChanged += (_, _) => EnqueueSyncMusicPresentationFromPlayback();
 	}
 
 	[ObservableProperty]
@@ -217,5 +217,17 @@ public partial class PlaybackPresentationManager : ObservableObject, IPlaybackPr
 			PlayQueueUpdate { PlayingItemIndex: >= 0 } update when update.PlayingItemIndex < update.Playlist.Count => update.Playlist[update.PlayingItemIndex].ItemId,
 			_ => null
 		};
+	}
+
+	private void EnqueueSyncMusicPresentationFromPlayback()
+	{
+		var dispatcher = App.MainWindow.DispatcherQueue;
+		if (dispatcher.HasThreadAccess)
+		{
+			SyncMusicPresentationFromPlayback();
+			return;
+		}
+
+		dispatcher.TryEnqueue(SyncMusicPresentationFromPlayback);
 	}
 }

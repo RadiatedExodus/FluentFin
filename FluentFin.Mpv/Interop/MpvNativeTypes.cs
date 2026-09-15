@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using FluentFin.Mpv;
 
 namespace FluentFin.Mpv.Interop;
 

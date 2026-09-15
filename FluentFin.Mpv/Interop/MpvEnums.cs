@@ -41,12 +41,3 @@ internal enum MpvEventId
 	QueueOverflow = 24,
 	Hook = 25
 }
-
-internal enum MpvEndFileReason
-{
-	Eof = 0,
-	Stop = 2,
-	Quit = 3,
-	Error = 4,
-	Redirect = 5
-}

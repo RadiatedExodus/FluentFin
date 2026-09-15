@@ -187,5 +187,91 @@ public static class DeviceProfiles
 			 ]
 		 };
 
-	public static DeviceProfile Mpv { get; } = Flyleaf;
+	public static DeviceProfile Mpv { get; } =
+		new DeviceProfile
+		{
+			Name = "mpv",
+			MaxStaticBitrate = 120_000_000,
+			MaxStreamingBitrate = 80_000_000,
+			CodecProfiles = [
+				new ()
+				{
+					Type = CodecProfile_Type.Video,
+					Codec = "h264,hevc,h265,av1,vp9,vp8,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,theora,msmpeg4v3,mjpeg"
+				},
+				new ()
+				{
+					Type = CodecProfile_Type.Audio,
+					Codec = "aac,ac3,eac3,truehd,dts,dtshd,dca,mp3,flac,alac,opus,vorbis,pcm,pcm_s16le,pcm_s24le,pcm_f32le,wma,wmav2,mp2"
+				},
+			],
+			DirectPlayProfiles = [
+				new ()
+				{
+					Type = DirectPlayProfile_Type.Video,
+					Container = "mkv,webm,mp4,m4v,mov,avi,wmv,asf,mpg,mpeg,ts,m2ts,m2t,vob,ogv,ogg,flv,3gp,3g2",
+					VideoCodec = "h264,hevc,h265,av1,vp9,vp8,mpeg4,mpeg2video,mpeg1video,vc1,wmv3,theora,msmpeg4v3,mjpeg",
+					AudioCodec = "aac,ac3,eac3,truehd,dts,dtshd,dca,mp3,flac,alac,opus,vorbis,pcm,pcm_s16le,pcm_s24le,pcm_f32le,wma,wmav2,mp2"
+				},
+				new ()
+				{
+					Type = DirectPlayProfile_Type.Audio,
+					Container = "mp3,aac,m4a,m4b,flac,alac,wav,ogg,oga,opus,webma,wma,ape",
+					AudioCodec = "mp3,aac,flac,alac,opus,vorbis,wma,wmav2,pcm,pcm_s16le,pcm_s24le,pcm_f32le,mp2,ape"
+				},
+			],
+			TranscodingProfiles = [
+				new ()
+				{
+					Type = TranscodingProfile_Type.Video,
+					Context = TranscodingProfile_Context.Streaming,
+					Protocol = TranscodingProfile_Protocol.Hls,
+					Container = "ts",
+					VideoCodec = "h264",
+					AudioCodec = "aac,ac3,mp3",
+					CopyTimestamps = false,
+					EnableSubtitlesInManifest = true,
+				},
+				new ()
+				{
+					Type = TranscodingProfile_Type.Audio,
+					Context = TranscodingProfile_Context.Streaming,
+					Protocol = TranscodingProfile_Protocol.Http,
+					Container = "mp3",
+					AudioCodec = "mp3",
+					MaxAudioChannels = "2",
+				}
+			],
+			SubtitleProfiles = CreateMpvSubtitleProfiles()
+		};
+
+	private static List<SubtitleProfile> CreateMpvSubtitleProfiles() =>
+	[
+		new () { Format = "ass", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "ass", Method = SubtitleProfile_Method.External },
+		new () { Format = "ssa", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "ssa", Method = SubtitleProfile_Method.External },
+		new () { Format = "srt", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "srt", Method = SubtitleProfile_Method.External },
+		new () { Format = "subrip", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "subrip", Method = SubtitleProfile_Method.External },
+		new () { Format = "vtt", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "vtt", Method = SubtitleProfile_Method.External },
+		new () { Format = "webvtt", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "webvtt", Method = SubtitleProfile_Method.External },
+		new () { Format = "pgs", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "pgssub", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "dvbsub", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "dvdsub", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "idx", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "sub", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "sub", Method = SubtitleProfile_Method.External },
+		new () { Format = "mov_text", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "ttml", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "ttml", Method = SubtitleProfile_Method.External },
+		new () { Format = "smi", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "smi", Method = SubtitleProfile_Method.External },
+		new () { Format = "text", Method = SubtitleProfile_Method.Embed },
+		new () { Format = "text", Method = SubtitleProfile_Method.External },
+	];
 }

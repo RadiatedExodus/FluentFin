@@ -19,6 +19,9 @@ internal static partial class MpvNative
 	[LibraryImport("libmpv-2", EntryPoint = "mpv_command")]
 	internal static partial int Command(nint handle, nint args);
 
+	[LibraryImport("libmpv-2", EntryPoint = "mpv_command_async")]
+	internal static partial int CommandAsync(nint handle, ulong replyUserData, nint args);
+
 	[LibraryImport("libmpv-2", EntryPoint = "mpv_wait_event")]
 	internal static partial nint WaitEvent(nint handle, double timeout);
 
