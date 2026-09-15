@@ -138,14 +138,14 @@ public sealed partial class TransportControls : UserControl
 						return;
 					}
 
+					if (!_isSeekingWithSlider)
+					{
+						return;
+					}
+
 					_pendingSliderSeek = TimeSpan.FromMilliseconds(x.NewValue);
 					TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(_pendingSliderSeek.Value);
 					TxtRemainingTime.Text = TimeRemaining(_pendingSliderSeek.Value, TimeSpan.FromMilliseconds(TimeSlider.Maximum));
-
-					if (!_isSeekingWithSlider)
-					{
-						_ = CommitSliderSeekAfterQuietPeriod(++_sliderSeekVersion);
-					}
 				}
 				catch { }
 			});
@@ -251,15 +251,6 @@ public sealed partial class TransportControls : UserControl
 	private async Task TogglePlayPause()
 	{
 		await Player.TogglePlayPlause(JellyfinClient);
-	}
-
-	private async Task CommitSliderSeekAfterQuietPeriod(int version)
-	{
-		await Task.Delay(150);
-		if (version == _sliderSeekVersion && !_isSeekingWithSlider)
-		{
-			CommitSliderSeek();
-		}
 	}
 
 	private void BeginSliderSeek()

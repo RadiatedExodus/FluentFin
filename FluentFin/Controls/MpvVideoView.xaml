@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="FluentFin.Controls.MpvVideoView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Background="Black">
+        <SwapChainPanel
+            x:Name="VideoSurface"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            SizeChanged="VideoSurface_SizeChanged"
+            Unloaded="VideoSurface_Unloaded" />
+    </Grid>
+</UserControl>

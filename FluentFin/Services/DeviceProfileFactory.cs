@@ -19,6 +19,7 @@ namespace FluentFin.Services
 			return type switch
 			{
 				MediaPlayerType.Flyleaf => DeviceProfiles.Flyleaf,
+				MediaPlayerType.Mpv => DeviceProfiles.Mpv,
 				MediaPlayerType.WindowsMediaPlayer => WmpDeviceProfileManager.Profile,
 				_ => DeviceProfiles.Flyleaf,
 			};

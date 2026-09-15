@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentFin.Plugins", "Fluent
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentFin.UI.Core", "FluentFin.UI.Core\FluentFin.UI.Core.csproj", "{A0920681-4A94-4F9F-9D8A-02FDB64F365B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluentFin.Mpv", "FluentFin.Mpv\FluentFin.Mpv.csproj", "{69A98BCA-E5A1-4E94-A4C0-C8E185BDD5EE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -35,6 +37,10 @@ Global
 		{A0920681-4A94-4F9F-9D8A-02FDB64F365B}.Debug|x64.Build.0 = Debug|x64
 		{A0920681-4A94-4F9F-9D8A-02FDB64F365B}.Release|x64.ActiveCfg = Release|x64
 		{A0920681-4A94-4F9F-9D8A-02FDB64F365B}.Release|x64.Build.0 = Release|x64
+		{69A98BCA-E5A1-4E94-A4C0-C8E185BDD5EE}.Debug|x64.ActiveCfg = Debug|x64
+		{69A98BCA-E5A1-4E94-A4C0-C8E185BDD5EE}.Debug|x64.Build.0 = Debug|x64
+		{69A98BCA-E5A1-4E94-A4C0-C8E185BDD5EE}.Release|x64.ActiveCfg = Release|x64
+		{69A98BCA-E5A1-4E94-A4C0-C8E185BDD5EE}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

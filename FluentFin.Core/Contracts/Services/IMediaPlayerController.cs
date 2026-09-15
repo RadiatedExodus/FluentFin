@@ -49,7 +49,8 @@ public enum MediaPlayerType
 {
 	Vlc,
 	Flyleaf,
-	WindowsMediaPlayer
+	WindowsMediaPlayer,
+	Mpv
 }
 
 public record struct AudioTrack(int Id, string? Language, string? Name);

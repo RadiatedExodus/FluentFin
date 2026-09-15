@@ -45,20 +45,26 @@ public sealed class VideoPlaybackController(
 
 	public async Task StartAsync(CancellationToken cancellationToken = default)
 	{
-		if (_engine is null || _request is null)
+		if (_engine is null || _request is not { } request)
 		{
 			return;
 		}
 
-		logger.LogInformation("VideoPlaybackController starting item. ItemId={ItemId}", _request.StartItem.JellyfinId);
+		logger.LogInformation("VideoPlaybackController starting item. ItemId={ItemId}", request.StartItem.JellyfinId);
 		await _engine.PlayAsync(cancellationToken);
 
-		if (_request.StartPosition is { } startPosition && startPosition > TimeSpan.Zero)
+		if (!ReferenceEquals(_request, request))
+		{
+			logger.LogInformation("VideoPlaybackController start abandoned because playback was stopped or replaced. ItemId={ItemId}", request.StartItem.JellyfinId);
+			return;
+		}
+
+		if (request.StartPosition is { } startPosition && startPosition > TimeSpan.Zero)
 		{
 			await _engine.SeekAsync(startPosition, cancellationToken);
 		}
 
-		await jellyfinClient.Playing(_request.StartItem.Item);
+		await jellyfinClient.Playing(request.StartItem.Item);
 	}
 
 	public Task PauseAsync(CancellationToken cancellationToken = default) => _engine?.PauseAsync(cancellationToken) ?? Task.CompletedTask;

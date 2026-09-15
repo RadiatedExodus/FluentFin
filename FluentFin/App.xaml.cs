@@ -125,6 +125,9 @@ public partial class App : Application
 			services.AddSingleton<ILyricsProvider, JellyfinLyricsProvider>();
 			services.AddSingleton<ILyricsService, LyricsService>();
 			services.AddSingleton<WindowsMusicPlaybackEngine>();
+			services.AddSingleton<MpvTrackMapper>();
+			services.AddSingleton<MpvPlaybackEngine>();
+			services.AddTransient<PlaybackServiceMediaPlayerControllerAdapter>();
 			services.AddSingleton<IPlaybackController, VideoPlaybackController>();
 			services.AddSingleton<MusicPlaybackController>();
 			services.AddSingleton<IMusicPlaybackController>(sp => sp.GetRequiredService<MusicPlaybackController>());

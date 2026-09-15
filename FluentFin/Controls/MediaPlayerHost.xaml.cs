@@ -80,6 +80,7 @@ public sealed partial class MediaPlayerHost : UserControl
 					Core.Contracts.Services.MediaPlayerType.Vlc => CreateVLC(),
 					Core.Contracts.Services.MediaPlayerType.Flyleaf => CreateFlyleaf(),
 					Core.Contracts.Services.MediaPlayerType.WindowsMediaPlayer => CreateWindowsMediaPlayer(),
+					Core.Contracts.Services.MediaPlayerType.Mpv => CreateMpv(),
 					_ => throw new NotImplementedException()
 				};
 
@@ -120,6 +121,24 @@ public sealed partial class MediaPlayerHost : UserControl
 		var view = new VideoView();
 		view.Initialized += VLCInitialized;
 		return view;
+	}
+
+	private MpvVideoView CreateMpv()
+	{
+		var view = new MpvVideoView();
+		var player = App.GetService<PlaybackServiceMediaPlayerControllerAdapter>();
+		player.MediaLoaded
+			.ObserveOn(RxApp.MainThreadScheduler)
+			.Subscribe(_ => RefreshMpvAudioTracksFlyout(player));
+		Player = player;
+		return view;
+	}
+
+	private void RefreshMpvAudioTracksFlyout(IMediaPlayerController player)
+	{
+		var flyout = Converters.Converters.GetAudiosFlyout(player, player.AudioTrackIndex ?? -1);
+		TransportControls.AudioSelectionButton.Flyout = flyout;
+		TransportControls.AudioSelectionButton.Visibility = flyout is null ? Visibility.Collapsed : Visibility.Visible;
 	}
 
 	private void VLCInitialized(object? sender, InitializedEventArgs e)

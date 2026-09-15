@@ -364,3 +364,7 @@ FodyWeavers.xsd
 
 # Installer output
 /Installer/Output
+
+# Downloaded native mpv runtime payloads. Recreate with:
+#   pwsh ./FluentFin.Mpv/scripts/Get-LibMpv.ps1
+/FluentFin.Mpv/native/mpv/win-*/

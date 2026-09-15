@@ -37,6 +37,14 @@ public sealed class PlaybackEngineManager(
 			return Task.FromResult<IMediaPlaybackEngine>(musicEngine);
 		}
 
+		if (settings.MediaPlayer is MediaPlayerType.Mpv)
+		{
+			var mpvEngine = serviceProvider.GetRequiredService<MpvPlaybackEngine>();
+			logger.LogInformation("Activating mpv video playback engine. EngineId={EngineId}", mpvEngine.Id);
+			ActiveEngine = mpvEngine;
+			return Task.FromResult<IMediaPlaybackEngine>(mpvEngine);
+		}
+
 		if (_registeredEngine is null)
 		{
 			throw new InvalidOperationException("No hosted media player is registered yet.");

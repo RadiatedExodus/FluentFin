@@ -32,7 +32,7 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 							ITaskBarProgress taskBarProgress,
 							IPlaybackService playbackService) : ObservableObject, INavigationAware
 {
-	private readonly CompositeDisposable _disposables = [];
+	private CompositeDisposable _disposables = [];
 	private readonly PlaybackProgressInfo _playbackProgressInfo = new();
 	private KeyboardMediaPlayerController? _keyboardController;
 	private PlayQueueUpdate? _playQueueUpdate;
@@ -70,6 +70,8 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 	public async Task OnNavigatedFrom()
 	{
 		_disposables.Dispose();
+		_disposables = [];
+		Playlist.PropertyChanged -= OnPlaylistPropertyChanged;
 
 		NativeMethods.AllowSleep();
 
@@ -109,7 +111,7 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 			return;
 		}
 
-		this.WhenAnyValue(x => x.MediaPlayer).WhereNotNull().Subscribe(SubscribeEvents);
+		this.WhenAnyValue(x => x.MediaPlayer).WhereNotNull().Subscribe(SubscribeEvents).DisposeWith(_disposables);
 		SubscribeWebsocketMessage();
 		NativeMethods.PreventSleep();
 
@@ -132,7 +134,8 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 				{
 					Playlist.SelectedItem = Playlist.Items.FirstOrDefault();
 				}
-			});
+			})
+			.DisposeWith(_disposables);
 
 		Observable.Timer(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20))
 			.SelectMany(_ => UpdateStatus().ToObservable())
@@ -384,32 +387,32 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 
 	private void SubscribeEvents(IMediaPlayerController mp)
 	{
-		mp.Playing.Where(_ => _disposables.IsDisposed).Subscribe(_ => mp.Stop());
 		mp.Ended.Where(_ => Playlist.CanSelectNext).Subscribe(_ =>
 		{
 			taskBarProgress.Clear();
 			Playlist.SelectNext();
-		});
+		}).DisposeWith(_disposables);
 		mp.Stopped.Subscribe(async _ =>
 		{
 			if (!_suppressLegacyStopReporting)
 			{
 				await JellyfinClient.Stop();
 			}
-		});
+		}).DisposeWith(_disposables);
 		mp.Errored.Subscribe(async _ =>
 		{
 			logger.LogError("An error occurred while playing media");
 			await JellyfinClient.Stop();
-		});
+		}).DisposeWith(_disposables);
 		mp.PositionChanged
 			.Where(_ => MediaPlayer?.State == MediaPlayerState.Playing)
 			.Select(x => x.Ticks)
 			.Select(ticks => Segments.Any(segment => ticks > segment.StartTicks && ticks < segment.EndTicks))
 			.DistinctUntilChanged()
 			.ObserveOn(RxApp.MainThreadScheduler)
-			.Subscribe(isVisible => IsSkipButtonVisible = isVisible);
-		mp.DurationChanged.Subscribe(d => _duration = d);
+			.Subscribe(isVisible => IsSkipButtonVisible = isVisible)
+			.DisposeWith(_disposables);
+		mp.DurationChanged.Subscribe(d => _duration = d).DisposeWith(_disposables);
 
 		mp.MediaLoaded
 		  .Where(_ => _playQueueUpdate is not null)
@@ -420,7 +423,8 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 			  PlaylistItemId = _playQueueUpdate!.Playlist[_playQueueUpdate.PlayingItemIndex].PlaylistItemId,
 			  PositionTicks = mp.Position.Ticks
 		  }).ToObservable())
-		  .Subscribe();
+		  .Subscribe()
+		  .DisposeWith(_disposables);
 	}
 
 	private void SubscribeWebsocketMessage()
@@ -470,7 +474,8 @@ public partial class VideoPlayerViewModel(IJellyfinClient jellyfinClient,
 						_previousCommand = syncPlay.Data;
 						break;
 				}
-			});
+			})
+			.DisposeWith(_disposables);
 	}
 
 	private async Task SchedulePause(SyncPlaySendCommand command, IMediaPlayerController mp)

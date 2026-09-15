@@ -184,6 +184,8 @@ public static class DeviceProfiles
 				new () { Format = "xsub", Method = SubtitleProfile_Method.Hls },
 				new () { Format = "xsub", Method = SubtitleProfile_Method.External },
 				new () { Format = "xsub", Method = SubtitleProfile_Method.Encode },
-			]
+			 ]
 		 };
+
+	public static DeviceProfile Mpv { get; } = Flyleaf;
 }
