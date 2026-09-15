@@ -142,6 +142,7 @@
                 Spacing="10"
                 Tapped="Interactive_Tapped">
                 <Button Command="{x:Bind ViewModel.OpenQueueCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8FD;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Queue" />
+                <Button Command="{x:Bind ViewModel.OpenLyricsCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE90A;}" Style="{ThemeResource BareButtonStyle}" Tapped="Interactive_Tapped" ToolTipService.ToolTip="Lyrics" />
                 <FontIcon
                     VerticalAlignment="Center"
                     FontSize="16"

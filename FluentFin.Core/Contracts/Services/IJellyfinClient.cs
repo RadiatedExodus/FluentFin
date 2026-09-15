@@ -68,6 +68,8 @@ namespace FluentFin.Core.Contracts.Services
 
 		Task<IReadOnlyList<BaseItemDto>> GetPlayableAudioItems(BaseItemDto dto, CancellationToken cancellationToken = default);
 
+		Task<LyricDto?> GetLyrics(Guid audioItemId, CancellationToken cancellationToken = default);
+
 		Uri GetImage(BaseItemDto item, ImageInfo info);
 
 		Task<List<SessionInfoDto>> GetControllableSessions();

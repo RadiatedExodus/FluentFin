@@ -143,7 +143,7 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 
 	private bool HasDismissablePresentation() =>
 		_playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
-		_playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue;
+		_playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue or MusicPresentationMode.Lyrics;
 
 	private bool IsChildNavigationPage()
 	{

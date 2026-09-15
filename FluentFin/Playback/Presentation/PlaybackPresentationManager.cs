@@ -105,6 +105,20 @@ public partial class PlaybackPresentationManager : ObservableObject, IPlaybackPr
 		OnPropertyChanged(nameof(HasActivePresentation));
 	}
 
+	public void ShowMusicLyrics()
+	{
+		if (!IsMusicActive())
+		{
+			return;
+		}
+
+		_logger.LogInformation("Showing music lyrics presentation. ItemId={ItemId}",
+			_playbackService.CurrentItem?.JellyfinId);
+		UpdateMusicState();
+		MusicMode = MusicPresentationMode.Lyrics;
+		OnPropertyChanged(nameof(HasActivePresentation));
+	}
+
 	public void HideMusic()
 	{
 		if (MusicMode is MusicPresentationMode.Hidden)
@@ -138,7 +152,7 @@ public partial class PlaybackPresentationManager : ObservableObject, IPlaybackPr
 			VideoOverlay = null;
 			Mode = PlaybackPresentationMode.None;
 		}
-		else if (MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue)
+		else if (MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue or MusicPresentationMode.Lyrics)
 		{
 			MusicMode = IsMusicActive() ? MusicPresentationMode.Compact : MusicPresentationMode.Hidden;
 			if (MusicMode is MusicPresentationMode.Hidden)

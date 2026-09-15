@@ -123,6 +123,30 @@ public partial class JellyfinClient
 		return items;
 	}
 
+	public async Task<LyricDto?> GetLyrics(Guid audioItemId, CancellationToken cancellationToken = default)
+	{
+		try
+		{
+			logger.LogInformation("Jellyfin lyrics request started. ItemId={ItemId}", audioItemId);
+			var lyrics = await _jellyfinApiClient.Audio[audioItemId].Lyrics.GetAsync(cancellationToken: cancellationToken);
+			logger.LogInformation("Jellyfin lyrics request completed. ItemId={ItemId}, HasLyrics={HasLyrics}, LineCount={LineCount}, IsSynced={IsSynced}",
+				audioItemId,
+				lyrics?.Lyrics?.Count > 0,
+				lyrics?.Lyrics?.Count ?? 0,
+				lyrics?.Metadata?.IsSynced);
+			return lyrics;
+		}
+		catch (OperationCanceledException)
+		{
+			throw;
+		}
+		catch (Exception ex)
+		{
+			logger.LogInformation(ex, "Jellyfin lyrics unavailable. ItemId={ItemId}", audioItemId);
+			return null;
+		}
+	}
+
 	private async Task<IReadOnlyList<BaseItemDto>> GetAlbumAudioItems(Guid albumId, CancellationToken cancellationToken)
 	{
 		var response = await _jellyfinApiClient.Items.GetAsync(x =>

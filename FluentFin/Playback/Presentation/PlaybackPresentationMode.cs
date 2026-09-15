@@ -12,5 +12,6 @@ public enum MusicPresentationMode
 	Hidden,
 	Compact,
 	Expanded,
-	Queue
+	Queue,
+	Lyrics
 }

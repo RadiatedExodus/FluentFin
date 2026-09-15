@@ -149,6 +149,7 @@
                     </Button>
                     <Button Command="{x:Bind ViewModel.StopCommand, Mode=OneWay}" Content="{ui:SymbolIcon Symbol=Stop}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Stop" />
                     <Button Command="{x:Bind ViewModel.OpenQueueCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE8FD;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Queue" />
+                    <Button Command="{x:Bind ViewModel.OpenLyricsCommand, Mode=OneWay}" Content="{ui:FontIcon Glyph=&#xE90A;, FontSize=20}" Style="{ThemeResource BareButtonStyle}" ToolTipService.ToolTip="Lyrics" />
                 </StackPanel>
 
                 <StackPanel

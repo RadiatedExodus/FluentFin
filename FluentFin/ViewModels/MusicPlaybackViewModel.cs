@@ -210,6 +210,18 @@ public partial class MusicPlaybackViewModel : ObservableObject
 	}
 
 	[RelayCommand]
+	private void OpenLyrics()
+	{
+		if (_presentationManager.MusicMode is MusicPresentationMode.Lyrics)
+		{
+			_presentationManager.ShowMusicCompact();
+			return;
+		}
+
+		_presentationManager.ShowMusicLyrics();
+	}
+
+	[RelayCommand]
 	private void ClosePresentation() => _presentationManager.ShowMusicCompact();
 
 	[RelayCommand]

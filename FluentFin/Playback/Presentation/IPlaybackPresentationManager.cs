@@ -16,6 +16,7 @@ public interface IPlaybackPresentationManager : INotifyPropertyChanged
 	void ShowMusicCompact();
 	void ShowMusicExpanded();
 	void ShowMusicQueue();
+	void ShowMusicLyrics();
 	void HideMusic();
 	Task HideAsync(CancellationToken cancellationToken = default);
 }

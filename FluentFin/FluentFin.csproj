@@ -129,6 +129,9 @@
 	  <Page Update="Controls\MusicQueuePanel.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>
+	  <Page Update="Controls\MusicLyricsPanel.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
 	</ItemGroup>
 
 	<ItemGroup>

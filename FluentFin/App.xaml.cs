@@ -5,6 +5,7 @@ using FluentFin.Contracts.Services;
 using FluentFin.Core;
 using FluentFin.Core.Contracts.Services;
 using FluentFin.Core.Playback;
+using FluentFin.Core.Playback.Lyrics;
 using FluentFin.Core.Services;
 using FluentFin.Core.Settings;
 using FluentFin.Core.ViewModels;
@@ -121,6 +122,8 @@ public partial class App : Application
 			services.AddSingleton<IPlaybackEngineManager, PlaybackEngineManager>();
 			services.AddSingleton<IHostedPlaybackEngineRegistry>(sp => (PlaybackEngineManager)sp.GetRequiredService<IPlaybackEngineManager>());
 			services.AddSingleton<IPlaybackPresentationManager, PlaybackPresentationManager>();
+			services.AddSingleton<ILyricsProvider, JellyfinLyricsProvider>();
+			services.AddSingleton<ILyricsService, LyricsService>();
 			services.AddSingleton<WindowsMusicPlaybackEngine>();
 			services.AddSingleton<IPlaybackController, VideoPlaybackController>();
 			services.AddSingleton<MusicPlaybackController>();
@@ -146,6 +149,7 @@ public partial class App : Application
 			services.AddTransient<MusicAlbumViewModel>();
 			services.AddTransient<MusicArtistViewModel>();
 			services.AddSingleton<MusicPlaybackViewModel>();
+			services.AddSingleton<MusicLyricsViewModel>();
 			services.AddTransient<LibraryViewModel>();
 			services.AddTransient<VideoPlayerViewModel>();
 			services.AddTransient<MovieViewModel>();

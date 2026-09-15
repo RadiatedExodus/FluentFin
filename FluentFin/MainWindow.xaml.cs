@@ -22,6 +22,7 @@ public sealed partial class MainWindow : WindowEx
 	private MusicMiniPlayer? _musicMiniPlayer;
 	private MusicExpandedPlayer? _musicExpandedPlayer;
 	private MusicQueuePanel? _musicQueuePanel;
+	private MusicLyricsPanel? _musicLyricsPanel;
 	private int _activeVideoRequestId;
 	private int _playbackPresentationUpdateQueued;
 	private int _musicPresentationAnimationVersion;
@@ -91,7 +92,7 @@ public sealed partial class MainWindow : WindowEx
 	{
 		var playbackPresentationManager = App.GetService<IPlaybackPresentationManager>();
 		if (playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
-			playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue)
+			playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue or MusicPresentationMode.Lyrics)
 		{
 			_ = playbackPresentationManager.HideAsync();
 			args.Handled = true;
@@ -172,6 +173,15 @@ public sealed partial class MainWindow : WindowEx
 				Grid.SetRowSpan(MusicOverlayPresenter, 1);
 				RootFrame.Margin = new Thickness(0, 0, 0, 96);
 				await ShowOverlayAsync(_musicQueuePanel, version);
+				await ShowMiniPlayerAsync(version);
+				break;
+			case MusicPresentationMode.Lyrics:
+				_musicLyricsPanel ??= new MusicLyricsPanel();
+				_musicMiniPlayer ??= new MusicMiniPlayer();
+				Grid.SetRow(MusicOverlayPresenter, 1);
+				Grid.SetRowSpan(MusicOverlayPresenter, 1);
+				RootFrame.Margin = new Thickness(0, 0, 0, 96);
+				await ShowOverlayAsync(_musicLyricsPanel, version);
 				await ShowMiniPlayerAsync(version);
 				break;
 			case MusicPresentationMode.Compact:
