@@ -4,16 +4,12 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:b="using:FluentFin.Behaviors"
-    xmlns:behaviors="using:FluentFin.Behaviors"
     xmlns:c="using:FluentFin.Converters"
     xmlns:cc="using:CommunityToolkit.WinUI.Converters"
-    xmlns:ctk="using:CommunityToolkit.WinUI.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:devwinui="using:DevWinUI"
     xmlns:i="using:Microsoft.Xaml.Interactivity"
     xmlns:jm="using:Jellyfin.Sdk.Generated.Models"
     xmlns:lc="using:FluentFin.Controls"
-    xmlns:local="using:FluentFin.Views"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:root="using:FluentFin"
     xmlns:ui="using:CommunityToolkit.WinUI"
@@ -24,166 +20,220 @@
             x:Key="ObjectToVisibilityConverter"
             EmptyValue="Collapsed"
             NotEmptyValue="Visible" />
-        <cc:EmptyObjectToObjectConverter
-            x:Key="ObjectToBoolConverter"
-            EmptyValue="False"
-            NotEmptyValue="True" />
     </UserControl.Resources>
 
-    <TitleBar
-        x:Name="TitleBar"
-        Title="FluentFin"
-        BackRequested="TitleBar_BackRequested"
-        IsBackButtonEnabled="{x:Bind ViewModel.CanGoBack, Mode=OneWay}"
-        IsBackButtonVisible="{x:Bind ViewModel.User, Converter={StaticResource ObjectToBoolConverter}, Mode=OneWay}"
-        IsPaneToggleButtonVisible="False"
-        Subtitle="{x:Bind ViewModel.Version}"
-        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.IsVisible), Mode=OneWay}">
-        <TitleBar.IconSource>
-            <ImageIconSource ImageSource="/Assets/icons8-jellyfin-color-hand-drawn-70.png" />
-        </TitleBar.IconSource>
-        <TitleBar.Content>
-            <AutoSuggestBox
-                x:Name="SearchBox"
-                Width="600"
-                Margin="{StaticResource XSmallTopBottomMargin}"
-                PlaceholderText="Search movies, series, actors and more"
-                QueryIcon="Find"
-                Visibility="{x:Bind ViewModel.User, Converter={StaticResource ObjectToVisibilityConverter}, Mode=OneWay}">
-                <AutoSuggestBox.KeyboardAccelerators>
-                    <KeyboardAccelerator
-                        Key="F"
-                        Invoked="KeyboardAccelerator_Invoked"
-                        Modifiers="Control" />
-                </AutoSuggestBox.KeyboardAccelerators>
-                <i:Interaction.Behaviors>
-                    <b:GlobalSearchBoxBehavior />
-                </i:Interaction.Behaviors>
-                <AutoSuggestBox.ItemTemplate>
-                    <DataTemplate x:DataType="jm:BaseItemDto">
-                        <Grid Padding="3" ColumnSpacing="20">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid CornerRadius="{StaticResource ControlCornerRadius}">
-                                <lc:LazyLoadedImage
-                                    Height="90"
-                                    BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
-                                    ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
-                                    Stretch="UniformToFill" />
-                            </Grid>
-                            <StackPanel Grid.Column="1">
-                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
-                                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind c:BaseItemDtoConverters.GetCardSubtitle((jm:BaseItemDto))}" />
-                                <TextBlock Style="{ThemeResource CaptionTextBlockStyle}" Text="{x:Bind Type}" />
-                            </StackPanel>
-                        </Grid>
-                    </DataTemplate>
-                </AutoSuggestBox.ItemTemplate>
-                <AutoSuggestBox.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Spacing="10" />
-                    </ItemsPanelTemplate>
-                </AutoSuggestBox.ItemsPanel>
-            </AutoSuggestBox>
-        </TitleBar.Content>
-        <TitleBar.RightHeader>
-            <StackPanel
-                HorizontalAlignment="Right"
-                Orientation="Horizontal"
-                Spacing="10">
-                <Button
-                    Width="32"
-                    Height="32"
-                    Padding="0"
-                    HorizontalAlignment="Right"
-                    BorderBrush="{ThemeResource CircleElevationBorderBrush}"
-                    CornerRadius="16"
-                    ToolTipService.ToolTip="{x:Bind ViewModel.User.Name}"
-                    Visibility="{x:Bind ViewModel.User, Converter={StaticResource ObjectToVisibilityConverter}, Mode=OneWay}">
-                    <PersonPicture
-                        Width="32"
-                        Height="32"
-                        DisplayName="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
-                    <Button.Flyout>
-                        <Flyout
-                            x:Name="FooterFlyout"
-                            AreOpenCloseAnimationsEnabled="True"
-                            LightDismissOverlayMode="On"
-                            Placement="BottomEdgeAlignedRight">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
+    <Grid
+        x:Name="RootChrome"
+        Background="{x:Bind c:Converters.TitleBarBackground(ViewModel.IsOverlayChromeMode), Mode=OneWay}">
+        <Grid.RenderTransform>
+            <TranslateTransform x:Name="ChromeTransform" />
+        </Grid.RenderTransform>
 
-                                <Grid ColumnSpacing="10">
+        <TitleBar
+            x:Name="TitleBar"
+            BackRequested="TitleBar_BackRequested"
+            IsBackButtonEnabled="False"
+            IsBackButtonVisible="False"
+            IsPaneToggleButtonVisible="False"
+            Subtitle=""
+            Title="">
+            <TitleBar.LeftHeader>
+                <Grid
+                    Margin="8,0,16,0"
+                    ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Grid
+                        x:Name="BackButtonSlot"
+                        Width="0"
+                        Opacity="0">
+                        <Button
+                            x:Name="BackButton"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Click="BackButton_Click"
+                            CornerRadius="6"
+                            IsEnabled="{x:Bind ViewModel.CanGoBack, Mode=OneWay}"
+                            ToolTipService.ToolTip="Back">
+                            <SymbolIcon
+                                Width="14"
+                                Height="14"
+                                Symbol="Back" />
+                        </Button>
+                    </Grid>
+
+                    <StackPanel
+                        x:Name="BrandStack"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <Image
+                            Width="24"
+                            Height="24"
+                            Source="/Assets/icons8-jellyfin-color-hand-drawn-70.png" />
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            FontWeight="Normal"
+                            Text="FluentFin" />
+                    </StackPanel>
+                </Grid>
+            </TitleBar.LeftHeader>
+
+            <TitleBar.Content>
+                <Grid>
+                    <AutoSuggestBox
+                        x:Name="SearchBox"
+                        Width="600"
+                        Margin="{StaticResource XSmallTopBottomMargin}"
+                        HorizontalAlignment="Center"
+                        PlaceholderText="Search movies, series, actors and more"
+                        QueryIcon="Find"
+                        Visibility="{x:Bind c:Converters.ObjectAndBooleanToVisibility(ViewModel.User, ViewModel.IsSearchAndProfileVisible), Mode=OneWay}">
+                        <AutoSuggestBox.KeyboardAccelerators>
+                            <KeyboardAccelerator
+                                Key="F"
+                                Invoked="KeyboardAccelerator_Invoked"
+                                Modifiers="Control" />
+                        </AutoSuggestBox.KeyboardAccelerators>
+                        <i:Interaction.Behaviors>
+                            <b:GlobalSearchBoxBehavior />
+                        </i:Interaction.Behaviors>
+                        <AutoSuggestBox.ItemTemplate>
+                            <DataTemplate x:DataType="jm:BaseItemDto">
+                                <Grid Padding="3" ColumnSpacing="20">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
-                                    <PersonPicture
-                                        Width="48"
-                                        Height="48"
-                                        DisplayName="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
-                                    <TextBlock
-                                        Grid.Column="1"
-                                        VerticalAlignment="Center"
-                                        Style="{ThemeResource BodyStrongTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
+                                    <Grid CornerRadius="{StaticResource ControlCornerRadius}">
+                                        <lc:LazyLoadedImage
+                                            Height="90"
+                                            BlurHashImageSource="{x:Bind c:BaseItemDtoConverters.GetBlurHash((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
+                                            ImageSource="{x:Bind c:BaseItemDtoConverters.GetImage((jm:BaseItemDto), jm:ImageType.Primary, 100)}"
+                                            Stretch="UniformToFill" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="{x:Bind Name}" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind c:BaseItemDtoConverters.GetCardSubtitle((jm:BaseItemDto))}" />
+                                        <TextBlock Style="{ThemeResource CaptionTextBlockStyle}" Text="{x:Bind Type}" />
+                                    </StackPanel>
                                 </Grid>
+                            </DataTemplate>
+                        </AutoSuggestBox.ItemTemplate>
+                        <AutoSuggestBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Spacing="10" />
+                            </ItemsPanelTemplate>
+                        </AutoSuggestBox.ItemsPanel>
+                    </AutoSuggestBox>
+                </Grid>
+            </TitleBar.Content>
 
-                                <MenuFlyoutSeparator Grid.Row="1" Margin="{StaticResource XSmallTopBottomMargin}" />
+            <TitleBar.RightHeader>
+                <StackPanel
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal"
+                    Spacing="10"
+                    Visibility="{x:Bind c:Converters.ObjectAndBooleanToVisibility(ViewModel.User, ViewModel.IsSearchAndProfileVisible), Mode=OneWay}">
+                    <Button
+                        Width="32"
+                        Height="32"
+                        Padding="0"
+                        HorizontalAlignment="Right"
+                        BorderBrush="{ThemeResource CircleElevationBorderBrush}"
+                        CornerRadius="16"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.User.Name}">
+                        <PersonPicture
+                            Width="32"
+                            Height="32"
+                            DisplayName="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
+                        <Button.Flyout>
+                            <Flyout
+                                x:Name="FooterFlyout"
+                                AreOpenCloseAnimationsEnabled="True"
+                                LightDismissOverlayMode="On"
+                                Placement="BottomEdgeAlignedRight">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                                <StackPanel Grid.Row="2">
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        AllowFocusOnInteraction="False"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind ViewModel.GoToDashboardCommand}"
-                                        Content="Dashboard"
-                                        Icon="{ui:FontIcon Glyph=&#xE713;}"
-                                        Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.User.Policy.IsAdministrator), Mode=OneWay}" />
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind root:App.Dialogs.ChangeDefaultSessionCommand}"
-                                        Content="Play On"
-                                        Icon="{ui:SymbolIcon Symbol=Remote}" />
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind root:App.Dialogs.SelectSyncPlayGroupCommand}"
-                                        Content="Sync Play"
-                                        Icon="{ui:FontIcon Glyph=&#xE895;}" />
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind ViewModel.LogoutCommand}"
-                                        Content="Logout"
-                                        Icon="{ui:FontIcon Glyph=&#xF3B1;}" />
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind ViewModel.SwitchUserCommand}"
-                                        Content="Switch user"
-                                        Icon="{ui:FontIcon Glyph=&#xE748;}" />
-                                    <lc:MenuFlyoutButton
-                                        HorizontalAlignment="Stretch"
-                                        Click="CloseTitleBarFooterFlyout"
-                                        Command="{x:Bind root:App.Dialogs.QuickConnectAuthCommand}"
-                                        Content="Quick Connect"
-                                        Icon="{ui:FontIcon Glyph=&#xE703;}" />
-                                </StackPanel>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <PersonPicture
+                                            Width="48"
+                                            Height="48"
+                                            DisplayName="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                            Text="{x:Bind ViewModel.User.Name, Mode=OneWay}" />
+                                    </Grid>
 
-                            </Grid>
-                        </Flyout>
-                    </Button.Flyout>
-                </Button>
-            </StackPanel>
-        </TitleBar.RightHeader>
-    </TitleBar>
+                                    <MenuFlyoutSeparator Grid.Row="1" Margin="{StaticResource XSmallTopBottomMargin}" />
 
+                                    <StackPanel Grid.Row="2">
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            AllowFocusOnInteraction="False"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind ViewModel.GoToDashboardCommand}"
+                                            Content="Dashboard"
+                                            Icon="{ui:FontIcon Glyph=&#xE713;}"
+                                            Visibility="{x:Bind c:Converters.BooleanToVisibility(ViewModel.User.Policy.IsAdministrator), Mode=OneWay}" />
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind root:App.Dialogs.ChangeDefaultSessionCommand}"
+                                            Content="Play On"
+                                            Icon="{ui:SymbolIcon Symbol=Remote}" />
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind root:App.Dialogs.SelectSyncPlayGroupCommand}"
+                                            Content="Sync Play"
+                                            Icon="{ui:FontIcon Glyph=&#xE895;}" />
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind ViewModel.LogoutCommand}"
+                                            Content="Logout"
+                                            Icon="{ui:FontIcon Glyph=&#xF3B1;}" />
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind ViewModel.SwitchUserCommand}"
+                                            Content="Switch user"
+                                            Icon="{ui:FontIcon Glyph=&#xE748;}" />
+                                        <lc:MenuFlyoutButton
+                                            HorizontalAlignment="Stretch"
+                                            Click="CloseTitleBarFooterFlyout"
+                                            Command="{x:Bind root:App.Dialogs.QuickConnectAuthCommand}"
+                                            Content="Quick Connect"
+                                            Icon="{ui:FontIcon Glyph=&#xE703;}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                </StackPanel>
+            </TitleBar.RightHeader>
+        </TitleBar>
+    </Grid>
 </UserControl>

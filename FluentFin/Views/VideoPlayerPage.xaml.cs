@@ -1,5 +1,4 @@
 using FluentFin.ViewModels;
-using FluentFin.Playback.Presentation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 
@@ -30,8 +29,4 @@ public sealed partial class VideoPlayerPage : Page
 		return ViewModel.OnNavigatedFrom();
 	}
 
-	private async void BackButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-	{
-		await App.GetService<IPlaybackPresentationManager>().HideAsync();
-	}
 }

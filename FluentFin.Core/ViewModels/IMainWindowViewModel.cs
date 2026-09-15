@@ -17,6 +17,9 @@ public interface ITitleBarViewModel : INotifyPropertyChanged
 	void TogglePane();
 	void GoBack();
 	bool CanGoBack { get; }
+	bool IsBackButtonVisible { get; }
+	bool IsOverlayChromeMode { get; set; }
+	bool IsSearchAndProfileVisible { get; }
 	UserDto? User { get; set; }
 	bool IsVisible { get; set; }
 	SavedServer? CurrentServer { get; set; }

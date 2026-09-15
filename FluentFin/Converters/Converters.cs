@@ -12,6 +12,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Foundation;
+using Windows.UI;
 
 namespace FluentFin.Converters;
 
@@ -61,7 +62,10 @@ public static class Converters
 	public static Visibility VisibleIfMoreThanOne(ObservableCollection<PlaylistItem> items) => VisibleIfMoreThanOne<PlaylistItem>(items);
 	public static Visibility VisibleIfMoreThanOne<T>(IList<T> values) => values.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
 	public static Visibility BooleanToVisibility(bool? value) => value is true ? Visibility.Visible : Visibility.Collapsed;
+	public static Visibility ObjectAndBooleanToVisibility(object? value, bool? isVisible) => value is not null && isVisible is true ? Visibility.Visible : Visibility.Collapsed;
 	public static bool BooleanNot(bool? value) => value is not true;
+	public static Brush TitleBarBackground(bool? isOverlayChromeMode) =>
+		isOverlayChromeMode is true ? new SolidColorBrush(Color.FromArgb(190, 12, 14, 18)) : new SolidColorBrush(Color.FromArgb(0, 0, 0, 0));
 	public static string JoinStrings(IEnumerable<string>? values) => values is null ? "" : string.Join(", ", values.Where(x => !string.IsNullOrWhiteSpace(x)));
 
 	public static string TimeSpanToString(TimeSpan ts)

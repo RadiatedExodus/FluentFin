@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.System;
+using Windows.UI;
 
 namespace FluentFin;
 
@@ -24,6 +25,8 @@ public sealed partial class MainWindow : WindowEx
 	private int _activeVideoRequestId;
 	private int _playbackPresentationUpdateQueued;
 	private int _musicPresentationAnimationVersion;
+	private CancellationTokenSource? _immersiveChromeHideCts;
+	private bool _captionButtonsAreVisible = true;
 
 	public IMainWindowViewModel ViewModel { get; } = App.GetService<IMainWindowViewModel>();
 
@@ -34,18 +37,21 @@ public sealed partial class MainWindow : WindowEx
 		InitializeComponent();
 		ExtendsContentIntoTitleBar = true;
 		AppWindow.SetIcon("Assets/jellyfin.ico");
+		SetCaptionButtonsVisible(true);
 
 		App.GetKeyedService<INavigationService>(NavigationRegions.InitialSetup).Frame = RootFrame;
 		_playbackPresentationManager.PropertyChanged += (_, e) =>
 		{
 			if (e.PropertyName is nameof(IPlaybackPresentationManager.Mode) or nameof(IPlaybackPresentationManager.MusicMode))
 			{
+				UpdateTopChromeMode();
 				QueuePlaybackPresentationUpdate();
 			}
 		};
 
 		RootGrid.KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.Left, VirtualKeyModifiers.Menu));
 		RootGrid.KeyboardAccelerators.Add(BuildKeyboardAccelerator(VirtualKey.GoBack));
+		UpdateTopChromeMode();
 	}
 
 	private static KeyboardAccelerator BuildKeyboardAccelerator(VirtualKey key, VirtualKeyModifiers? modifiers = null)
@@ -153,6 +159,8 @@ public sealed partial class MainWindow : WindowEx
 		{
 			case MusicPresentationMode.Expanded:
 				_musicExpandedPlayer ??= new MusicExpandedPlayer();
+				Grid.SetRow(MusicOverlayPresenter, 0);
+				Grid.SetRowSpan(MusicOverlayPresenter, 2);
 				RootFrame.Margin = new Thickness(0);
 				await HideMiniPlayerAsync(version);
 				await ShowOverlayAsync(_musicExpandedPlayer, version);
@@ -160,17 +168,23 @@ public sealed partial class MainWindow : WindowEx
 			case MusicPresentationMode.Queue:
 				_musicQueuePanel ??= new MusicQueuePanel();
 				_musicMiniPlayer ??= new MusicMiniPlayer();
+				Grid.SetRow(MusicOverlayPresenter, 1);
+				Grid.SetRowSpan(MusicOverlayPresenter, 1);
 				RootFrame.Margin = new Thickness(0, 0, 0, 96);
 				await ShowOverlayAsync(_musicQueuePanel, version);
 				await ShowMiniPlayerAsync(version);
 				break;
 			case MusicPresentationMode.Compact:
 				_musicMiniPlayer ??= new MusicMiniPlayer();
+				Grid.SetRow(MusicOverlayPresenter, 1);
+				Grid.SetRowSpan(MusicOverlayPresenter, 1);
 				RootFrame.Margin = new Thickness(0, 0, 0, 96);
 				await HideOverlayAsync(version);
 				await ShowMiniPlayerAsync(version);
 				break;
 			default:
+				Grid.SetRow(MusicOverlayPresenter, 1);
+				Grid.SetRowSpan(MusicOverlayPresenter, 1);
 				RootFrame.Margin = new Thickness(0);
 				await HideOverlayAsync(version);
 				await HideMiniPlayerAsync(version);
@@ -274,4 +288,133 @@ public sealed partial class MainWindow : WindowEx
 		Storyboard.SetTargetProperty(animation, property);
 		return animation;
 	}
+
+	private void UpdateTopChromeMode()
+	{
+		var isImmersive =
+			_playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
+			_playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded;
+
+		ViewModel.TitleBarViewModel.IsOverlayChromeMode = isImmersive;
+		ImmersiveTopChromeHotZone.IsHitTestVisible = isImmersive;
+
+		if (isImmersive)
+		{
+			HideImmersiveChromeNow();
+			return;
+		}
+
+		_immersiveChromeHideCts?.Cancel();
+		ViewModel.TitleBarViewModel.IsVisible = true;
+		SetCaptionButtonsVisible(true);
+	}
+
+	private void ImmersiveTopChrome_PointerEntered(object sender, PointerRoutedEventArgs e)
+	{
+		if (!IsImmersiveChromeActive())
+		{
+			return;
+		}
+
+		_immersiveChromeHideCts?.Cancel();
+		ViewModel.TitleBarViewModel.IsVisible = true;
+		SetCaptionButtonsVisible(true);
+	}
+
+	private void ImmersiveTopChrome_PointerExited(object sender, PointerRoutedEventArgs e)
+	{
+		if (IsImmersiveChromeActive())
+		{
+			ScheduleImmersiveChromeHide();
+		}
+	}
+
+	private void HideImmersiveChromeNow()
+	{
+		_immersiveChromeHideCts?.Cancel();
+		ViewModel.TitleBarViewModel.IsVisible = false;
+		SetCaptionButtonsVisible(false);
+	}
+
+	private void ScheduleImmersiveChromeHide()
+	{
+		_immersiveChromeHideCts?.Cancel();
+		var cts = new CancellationTokenSource();
+		_immersiveChromeHideCts = cts;
+		_ = HideImmersiveChromeAfterDelay(cts.Token);
+	}
+
+	private async Task HideImmersiveChromeAfterDelay(CancellationToken cancellationToken)
+	{
+		try
+		{
+			await Task.Delay(TimeSpan.FromMilliseconds(1400), cancellationToken);
+			if (!cancellationToken.IsCancellationRequested && IsImmersiveChromeActive())
+			{
+				ViewModel.TitleBarViewModel.IsVisible = false;
+				SetCaptionButtonsVisible(false);
+			}
+		}
+		catch (OperationCanceledException)
+		{
+		}
+	}
+
+	private void RootGrid_PointerMoved(object sender, PointerRoutedEventArgs e)
+	{
+		if (!IsImmersiveChromeActive())
+		{
+			return;
+		}
+
+		var position = e.GetCurrentPoint(RootGrid).Position;
+		if (position.Y <= 72)
+		{
+			_immersiveChromeHideCts?.Cancel();
+			ViewModel.TitleBarViewModel.IsVisible = true;
+			SetCaptionButtonsVisible(true);
+			return;
+		}
+
+		if (ViewModel.TitleBarViewModel.IsVisible)
+		{
+			ScheduleImmersiveChromeHide();
+		}
+	}
+
+	private void RootGrid_PointerExited(object sender, PointerRoutedEventArgs e)
+	{
+		if (IsImmersiveChromeActive())
+		{
+			ScheduleImmersiveChromeHide();
+		}
+	}
+
+	private void SetCaptionButtonsVisible(bool isVisible)
+	{
+		if (_captionButtonsAreVisible == isVisible)
+		{
+			return;
+		}
+
+		_captionButtonsAreVisible = isVisible;
+		var transparent = Color.FromArgb(0, 0, 0, 0);
+		var color = isVisible ? Color.FromArgb(255, 255, 255, 255) : transparent;
+		var hoverBackground = isVisible ? Color.FromArgb(32, 255, 255, 255) : transparent;
+		var pressedBackground = isVisible ? Color.FromArgb(48, 255, 255, 255) : transparent;
+		var inactiveColor = isVisible ? Color.FromArgb(160, 255, 255, 255) : transparent;
+
+		AppWindow.TitleBar.ButtonForegroundColor = color;
+		AppWindow.TitleBar.ButtonHoverForegroundColor = color;
+		AppWindow.TitleBar.ButtonPressedForegroundColor = color;
+		AppWindow.TitleBar.ButtonInactiveForegroundColor = inactiveColor;
+		AppWindow.TitleBar.ButtonBackgroundColor = transparent;
+		AppWindow.TitleBar.ButtonInactiveBackgroundColor = transparent;
+		AppWindow.TitleBar.ButtonHoverBackgroundColor = hoverBackground;
+		AppWindow.TitleBar.ButtonPressedBackgroundColor = pressedBackground;
+	}
+
+	private bool IsImmersiveChromeActive() =>
+		_playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
+		_playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded;
 }

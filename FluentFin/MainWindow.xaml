@@ -18,13 +18,21 @@
         <MicaBackdrop Kind="BaseAlt" />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid">
+    <Grid
+        x:Name="RootGrid"
+        PointerExited="RootGrid_PointerExited"
+        PointerMoved="RootGrid_PointerMoved">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition />
         </Grid.RowDefinitions>
 
-        <views:TitleBarControl Grid.Row="0" />
+        <views:TitleBarControl
+            x:Name="TitleBarHost"
+            Grid.Row="0"
+            Canvas.ZIndex="20"
+            PointerEntered="ImmersiveTopChrome_PointerEntered"
+            PointerExited="ImmersiveTopChrome_PointerExited" />
 
         <Frame x:Name="RootFrame" Grid.Row="1" />
 
@@ -68,6 +76,16 @@
                 <TranslateTransform x:Name="MusicMiniPlayerTransform" Y="96" />
             </ContentControl.RenderTransform>
         </ContentControl>
+
+        <Border
+            x:Name="ImmersiveTopChromeHotZone"
+            Grid.RowSpan="2"
+            Height="72"
+            VerticalAlignment="Top"
+            Background="Transparent"
+            Canvas.ZIndex="19"
+            IsHitTestVisible="False"
+            PointerEntered="ImmersiveTopChrome_PointerEntered" />
 
     </Grid>
 

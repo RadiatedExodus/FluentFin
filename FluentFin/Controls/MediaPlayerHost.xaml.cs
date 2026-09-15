@@ -209,11 +209,6 @@ public sealed partial class MediaPlayerHost : UserControl
 
 		TransportControls.FullWindowSymbol.Symbol = presenterKind == AppWindowPresenterKind.FullScreen ? Symbol.BackToWindow : Symbol.FullScreen;
 
-		if (App.GetService<ITitleBarViewModel>() is { } vm)
-		{
-			vm.IsVisible ^= true;
-		}
-
 		if (this.FindAscendant<NavigationView>() is { } navView)
 		{
 			navView.IsPaneVisible ^= true;

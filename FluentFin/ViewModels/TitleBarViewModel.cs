@@ -10,6 +10,7 @@ using FluentFin.Core.ViewModels;
 using FluentFin.Playback.Presentation;
 using FluentFin.UI.Core.Contracts.Services;
 using FluentFin.Views;
+using FluentFin.Views.JellyfinSettings;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +23,7 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 	private readonly INavigationViewService _navigationViewService;
 	private readonly IJellyfinClient _jellyfinClient;
 	private readonly IPlaybackPresentationManager _playbackPresentationManager;
+	private Type? _currentPageType;
 
 	public TitleBarViewModel(INavigationService navigationService,
 							 [FromKeyedServices(NavigationRegions.InitialSetup)] INavigationService setupNavigationService,
@@ -47,6 +49,15 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 
 	[ObservableProperty]
 	public partial bool CanGoBack { get; set; }
+
+	[ObservableProperty]
+	public partial bool IsBackButtonVisible { get; set; }
+
+	[ObservableProperty]
+	[NotifyPropertyChangedFor(nameof(IsSearchAndProfileVisible))]
+	public partial bool IsOverlayChromeMode { get; set; }
+
+	public bool IsSearchAndProfileVisible => !IsOverlayChromeMode;
 
 	[ObservableProperty]
 	public partial UserDto? User { get; set; }
@@ -99,6 +110,7 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 
 	private void NavigationService_Navigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
 	{
+		_currentPageType = e.SourcePageType;
 		RefreshCanGoBack();
 	}
 
@@ -124,11 +136,26 @@ public partial class TitleBarViewModel : ObservableObject, ITitleBarViewModel
 
 	private void RefreshCanGoBack()
 	{
-		CanGoBack = _navigationService.CanGoBack || HasDismissablePresentation();
+		var hasDismissablePresentation = HasDismissablePresentation();
+		CanGoBack = _navigationService.CanGoBack || hasDismissablePresentation;
+		IsBackButtonVisible = hasDismissablePresentation || IsChildNavigationPage();
 	}
 
 	private bool HasDismissablePresentation() =>
 		_playbackPresentationManager.Mode is PlaybackPresentationMode.VideoOverlay ||
 		_playbackPresentationManager.MusicMode is MusicPresentationMode.Expanded or MusicPresentationMode.Queue;
+
+	private bool IsChildNavigationPage()
+	{
+		if (User is null || _currentPageType is null)
+		{
+			return false;
+		}
+
+		return _currentPageType != typeof(HomePage) &&
+			   _currentPageType != typeof(MusicLibraryPage) &&
+			   _currentPageType != typeof(LibrariesLandingPage) &&
+			   _currentPageType != typeof(SettingsPage);
+	}
 
 }
