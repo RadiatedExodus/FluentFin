@@ -1,5 +1,6 @@
 ﻿using FluentFin.Core;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 using FluentFin.Core.Settings;
 using Jellyfin.Sdk.Generated.Models;
 

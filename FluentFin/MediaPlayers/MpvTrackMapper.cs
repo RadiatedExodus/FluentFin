@@ -1,4 +1,4 @@
-using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 using FluentFin.Mpv;
 using Jellyfin.Sdk.Generated.Models;
 using Microsoft.Extensions.Logging;

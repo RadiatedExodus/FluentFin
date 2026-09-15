@@ -412,9 +412,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Page Update="Controls\MediaPlayerHost.xaml">
-	    <Generator>MSBuild:Compile</Generator>
-	  </Page>
 	  <Page Update="Controls\MpvVideoView.xaml">
 	    <Generator>MSBuild:Compile</Generator>
 	  </Page>

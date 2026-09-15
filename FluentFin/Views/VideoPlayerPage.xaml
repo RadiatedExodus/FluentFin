@@ -5,20 +5,45 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:FluentFin.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:flyleaf="using:FlyleafLib.Controls.WinUI"
-    xmlns:local="using:FluentFin.Views"
-    xmlns:lvs="using:LibVLCSharp.Platforms.Windows"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <controls:MediaPlayerHost
-        x:Name="MediaPlayerHost"
-        IsSkipButtonVisible="{x:Bind ViewModel.IsSkipButtonVisible, Mode=OneWay}"
-        JellyfinClient="{x:Bind ViewModel.JellyfinClient}"
-        MediaPlayerType="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}"
-        Player="{x:Bind ViewModel.MediaPlayer, Mode=TwoWay}"
-        Playlist="{x:Bind ViewModel.Playlist, Mode=OneWay}"
-        SkipCommand="{x:Bind ViewModel.SkipCommand, Mode=OneWay}"
-        Trickplay="{x:Bind ViewModel.TrickplayViewModel}" />
+    <Grid
+        x:Name="Root"
+        Background="Black"
+        DoubleTapped="Root_DoubleTapped"
+        IsDoubleTapEnabled="True">
+        <controls:VideoSurfaceHost Backend="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}" />
 
+        <controls:TransportControls
+            x:Name="TransportControls"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            AudioTracks="{x:Bind ViewModel.AudioTracks, Mode=OneWay}"
+            DisableSubtitlesCommand="{x:Bind ViewModel.DisableSubtitlesCommand, Mode=OneWay}"
+            Duration="{x:Bind ViewModel.Duration, Mode=OneWay}"
+            IsSkipButtonVisible="{x:Bind ViewModel.IsSkipButtonVisible, Mode=OneWay}"
+            JellyfinClient="{x:Bind ViewModel.JellyfinClient}"
+            PlaybackState="{x:Bind ViewModel.PlaybackState, Mode=OneWay}"
+            Playlist="{x:Bind ViewModel.Playlist, Mode=OneWay}"
+            Position="{x:Bind ViewModel.Position, Mode=OneWay}"
+            SeekCommand="{x:Bind ViewModel.SeekCommand, Mode=OneWay}"
+            SelectAudioTrackCommand="{x:Bind ViewModel.SelectAudioTrackCommand, Mode=OneWay}"
+            SelectSubtitleTrackCommand="{x:Bind ViewModel.SelectSubtitleTrackCommand, Mode=OneWay}"
+            SelectedAudioTrackIndex="{x:Bind ViewModel.SelectedAudioTrackIndex, Mode=OneWay}"
+            SelectedSubtitleTrackIndex="{x:Bind ViewModel.SelectedSubtitleTrackIndex, Mode=OneWay}"
+            SetVolumeCommand="{x:Bind ViewModel.SetVolumeCommand, Mode=OneWay}"
+            SkipBackwardCommand="{x:Bind ViewModel.SkipBackwardCommand, Mode=OneWay}"
+            SkipCommand="{x:Bind ViewModel.SkipCommand, Mode=OneWay}"
+            SkipForwardCommand="{x:Bind ViewModel.SkipForwardCommand, Mode=OneWay}"
+            SkipNextCommand="{x:Bind ViewModel.SkipNextCommand, Mode=OneWay}"
+            SkipPreviousCommand="{x:Bind ViewModel.SkipPreviousCommand, Mode=OneWay}"
+            StopCommand="{x:Bind ViewModel.StopCommand, Mode=OneWay}"
+            SubtitleText="{x:Bind ViewModel.SubtitleText, Mode=OneWay}"
+            SubtitleTracks="{x:Bind ViewModel.SubtitleTracks, Mode=OneWay}"
+            ToggleFullscreenCommand="{x:Bind ViewModel.ToggleFullscreenCommand, Mode=OneWay}"
+            TogglePlayPauseCommand="{x:Bind ViewModel.TogglePlayPauseCommand, Mode=OneWay}"
+            Trickplay="{x:Bind ViewModel.TrickplayViewModel}"
+            Volume="{x:Bind ViewModel.Volume, Mode=OneWay}" />
+    </Grid>
 </Page>

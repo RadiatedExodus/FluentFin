@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 
 namespace FluentFin.Core.Settings;
 

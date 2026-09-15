@@ -25,11 +25,9 @@
             <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
-        <controls:MediaPlayerHost
+        <controls:VideoSurfaceHost
             Margin="100,0,100,36"
-            MediaPlayerType="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}"
-            Player="{x:Bind ViewModel.MediaPlayer, Mode=TwoWay}"
-            Playlist="{x:Bind ViewModel.Playlist}" />
+            Backend="{x:Bind ViewModel.MediaPlayerType, Mode=OneWay}" />
 
         <ScrollView Grid.Row="1">
             <StackPanel Spacing="10">

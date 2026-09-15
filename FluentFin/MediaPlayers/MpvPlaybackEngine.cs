@@ -38,7 +38,17 @@ public sealed class MpvPlaybackEngine(
 	public TimeSpan Position => _position;
 	public TimeSpan Duration => _duration;
 	public bool IsPlaying => _state is PlaybackState.Playing;
-	public bool IsMuted => _mpv?.Muted ?? false;
+	public bool IsMuted
+	{
+		get => _mpv?.Muted ?? false;
+		set
+		{
+			if (_mpv is not null)
+			{
+				_mpv.Muted = value;
+			}
+		}
+	}
 	public int? SubtitleTrackIndex => _subtitleTrackIndex;
 	public int? AudioTrackIndex => _audioTrackIndex;
 	public nint VideoSwapChain { get; private set; }

@@ -35,7 +35,11 @@ public sealed class WindowsMusicPlaybackEngine : IQueuedPlaybackEngine, IPlaybac
 	public TimeSpan Position => SafeGetValue(x => x.Position, TimeSpan.Zero);
 	public TimeSpan Duration => SafeGetValue(x => x.NaturalDuration, TimeSpan.Zero);
 	public bool IsPlaying => SafeGetValue(x => x.CurrentState, MediaPlayerState.Closed) is MediaPlayerState.Playing;
-	public bool IsMuted => SafeGetValue(x => x.IsMuted, false);
+	public bool IsMuted
+	{
+		get => SafeGetValue(x => x.IsMuted, false);
+		set => SafeSetValue(x => x.IsMuted = value);
+	}
 
 	public double Volume
 	{
@@ -287,6 +291,20 @@ public sealed class WindowsMusicPlaybackEngine : IQueuedPlaybackEngine, IPlaybac
 		catch
 		{
 			return defaultValue;
+		}
+	}
+
+	private void SafeSetValue(Action<MediaPlayer> setter)
+	{
+		try
+		{
+			if (!_disposed)
+			{
+				setter(_player);
+			}
+		}
+		catch
+		{
 		}
 	}
 

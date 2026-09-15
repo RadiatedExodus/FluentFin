@@ -1,36 +1,34 @@
-﻿using System.Collections.ObjectModel;
-using System.Reactive.Linq;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DynamicData;
 using FluentFin.Contracts.ViewModels;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 using FluentFin.Core.Settings;
 using Jellyfin.Sdk.Generated.Models;
-using ReactiveUI;
 
 namespace FluentFin.ViewModels;
 
-public partial class MediaSegmentsEditorViewModel(IJellyfinClient jellyfinClient, ISettings settings) : ObservableObject, INavigationAware
+public partial class MediaSegmentsEditorViewModel(
+	IJellyfinClient jellyfinClient,
+	ISettings settings,
+	IPlaybackService playbackService) : ObservableObject, INavigationAware
 {
-
 	[ObservableProperty]
 	public partial PlaylistViewModel Playlist { get; set; } = new();
-
-	[ObservableProperty]
-	public partial IMediaPlayerController? MediaPlayer { get; set; }
 
 	[ObservableProperty]
 	public partial MediaPlayerType MediaPlayerType { get; set; }
 
 	public ObservableCollection<MediaSegmentViewModel> Segments { get; } = [];
-	public long CurrentTimeTicks { get; set; }
+	public long CurrentTimeTicks => playbackService.Position.Ticks;
 	public MediaSegmentViewModel? PlayingSegment { get; set; }
 
 	public Task OnNavigatedFrom()
 	{
-		MediaPlayer?.Stop();
-		return Task.CompletedTask;
+		Playlist.PropertyChanged -= OnPlaylistPropertyChanged;
+		playbackService.PlaybackChanged -= PlaybackService_PlaybackChanged;
+		return playbackService.StopAsync();
 	}
 
 	public async Task OnNavigatedTo(object parameter)
@@ -41,7 +39,6 @@ public partial class MediaSegmentsEditorViewModel(IJellyfinClient jellyfinClient
 		}
 
 		MediaPlayerType = settings.MediaPlayer;
-
 		Playlist = dto.Type switch
 		{
 			BaseItemDto_Type.Movie => PlaylistViewModel.FromMovie(dto),
@@ -57,84 +54,62 @@ public partial class MediaSegmentsEditorViewModel(IJellyfinClient jellyfinClient
 		}
 
 		Playlist.PropertyChanged += OnPlaylistPropertyChanged;
+		playbackService.PlaybackChanged += PlaybackService_PlaybackChanged;
 
-		this.WhenAnyValue(x => x.MediaPlayer)
-			.WhereNotNull()
-			.ObserveOn(RxApp.MainThreadScheduler)
-			.Subscribe(mp =>
-			{
-				mp.PositionChanged
-				  .Subscribe(time =>
-				  {
-					  CurrentTimeTicks = time.Ticks;
-
-					  if (PlayingSegment is { } segment && CurrentTimeTicks > segment.EndTicks)
-					  {
-						  mp.Pause();
-						  PlayingSegment = null;
-					  }
-				  });
-
-				if (dto.Type == BaseItemDto_Type.Episode)
-				{
-					Playlist.SelectedItem = Playlist.Items.FirstOrDefault(x => x.Dto.IndexNumber == dto.IndexNumber && x.Dto.ParentIndexNumber == dto.ParentIndexNumber);
-				}
-				else
-				{
-					Playlist.SelectedItem = Playlist.Items.FirstOrDefault();
-				}
-			});
-
-
+		if (dto.Type == BaseItemDto_Type.Episode)
+		{
+			Playlist.SelectedItem = Playlist.Items.FirstOrDefault(x => x.Dto.IndexNumber == dto.IndexNumber && x.Dto.ParentIndexNumber == dto.ParentIndexNumber);
+		}
+		else
+		{
+			Playlist.SelectedItem = Playlist.Items.FirstOrDefault();
+		}
 	}
 
 	private async void OnPlaylistPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 	{
-		if (e.PropertyName != nameof(Playlist.SelectedItem))
+		if (e.PropertyName != nameof(Playlist.SelectedItem) || Playlist.SelectedItem is not { } selectedItem)
 		{
 			return;
 		}
 
-		if (Playlist.SelectedItem is not { } selectedItem)
-		{
-			return;
-		}
-
-		if (MediaPlayer is null)
-		{
-			return;
-		}
-
-		MediaPlayer.Stop();
-
+		await playbackService.StopAsync();
 		var full = await jellyfinClient.GetItem(selectedItem.Dto.Id ?? Guid.Empty);
-
 		if (full is null)
 		{
 			return;
 		}
 
-		var mediaResponse = await jellyfinClient.GetMediaUrl(full);
+		var index = Math.Max(0, Playlist.Items.IndexOf(selectedItem));
+		var queue = Playlist.Items
+			.Select((item, itemIndex) => PlaybackItem.FromDto(itemIndex == index ? full : item.Dto, PlaybackKind.Video))
+			.ToList();
 
-		if (mediaResponse is null)
+		await playbackService.PlayAsync(new PlaybackRequest
 		{
-			return;
-		}
-
-		selectedItem.Media = mediaResponse;
-
-		var success = MediaPlayer.Play(mediaResponse.Uri);
-		if (!success)
-		{
-			return;
-		}
-
-		MediaPlayer.Pause();
+			Kind = PlaybackKind.Video,
+			StartItem = queue[index],
+			QueueItems = queue,
+			StartIndex = index
+		});
+		await playbackService.PauseAsync();
 
 		if (await jellyfinClient.GetMediaSegments(selectedItem.Dto) is { Items.Count: > 0 } segmentsResults)
 		{
 			Segments.Clear();
-			Segments.AddRange(segmentsResults.Items.Select(MediaSegmentViewModel.FromDto));
+			foreach (var segment in segmentsResults.Items.Select(MediaSegmentViewModel.FromDto))
+			{
+				Segments.Add(segment);
+			}
+		}
+	}
+
+	private async void PlaybackService_PlaybackChanged(object? sender, EventArgs e)
+	{
+		if (PlayingSegment is { } segment && playbackService.Position.Ticks > segment.EndTicks)
+		{
+			await playbackService.PauseAsync();
+			PlayingSegment = null;
 		}
 	}
 
@@ -148,7 +123,6 @@ public partial class MediaSegmentsEditorViewModel(IJellyfinClient jellyfinClient
 	private async Task DeleteSegment(MediaSegmentViewModel vm)
 	{
 		Segments.Remove(vm);
-
 		if (vm.Id is { } id)
 		{
 			await jellyfinClient.DeleteMediaSegment(id);
@@ -167,11 +141,11 @@ public partial class MediaSegmentsEditorViewModel(IJellyfinClient jellyfinClient
 	}
 
 	[RelayCommand]
-	private void PlaySegment(MediaSegmentViewModel vm)
+	private async Task PlaySegment(MediaSegmentViewModel vm)
 	{
 		PlayingSegment = vm;
-		MediaPlayer?.Play();
-		MediaPlayer?.SeekTo(new TimeSpan(vm.StartTicks));
+		await playbackService.SeekAsync(new TimeSpan(vm.StartTicks));
+		await playbackService.ResumeAsync();
 	}
 }
 

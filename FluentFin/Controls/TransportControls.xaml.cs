@@ -1,231 +1,288 @@
-using System.Reactive;
-using System.Reactive.Linq;
-using System.Reactive.Subjects;
+using System.Collections.ObjectModel;
 using System.Windows.Input;
 using CommunityToolkit.WinUI;
-using FluentFin.Core;
 using FluentFin.Core.Contracts.Services;
+using FluentFin.Core.Playback;
 using FluentFin.ViewModels;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using ReactiveMarbles.ObservableEvents;
-using ReactiveUI;
-
 
 namespace FluentFin.Controls;
 
-#nullable disable
 public sealed partial class TransportControls : UserControl
 {
-	private readonly Subject<PointerRoutedEventArgs> _onPointerMoved = new();
 	private readonly SymbolIcon _playSymbol = new(Symbol.Play);
 	private readonly SymbolIcon _pauseSymbol = new(Symbol.Pause);
 	private bool _isSeekingWithSlider;
-	private bool _isUpdatingSliderFromPlayer;
+	private bool _isUpdatingSliderFromState;
 	private bool _resumePlaybackAfterSliderSeek;
 	private TimeSpan? _pendingSliderSeek;
 	private DateTimeOffset _holdSliderPositionUntil;
-	private int _sliderSeekVersion;
 
 	[GeneratedDependencyProperty]
 	public partial bool IsSkipButtonVisible { get; set; }
 
 	[GeneratedDependencyProperty]
-	public partial PlaylistViewModel Playlist { get; set; }
-
-
-	[GeneratedDependencyProperty]
-	public partial ICommand SkipCommand { get; set; }
+	public partial PlaylistViewModel? Playlist { get; set; }
 
 	[GeneratedDependencyProperty]
-	public partial TrickplayViewModel Trickplay { get; set; }
+	public partial ICommand? SkipCommand { get; set; }
 
 	[GeneratedDependencyProperty]
-	public partial IJellyfinClient JellyfinClient { get; set; }
+	public partial TrickplayViewModel? Trickplay { get; set; }
 
-	public IMediaPlayerController Player
-	{
-		get
-		{
-			try
-			{
-				return (IMediaPlayerController)GetValue(PlayerProperty);
-			}
-			catch
-			{
-				return null;
-			}
-		}
-		set { SetValue(PlayerProperty, value); }
-	}
+	[GeneratedDependencyProperty]
+	public partial IJellyfinClient? JellyfinClient { get; set; }
 
-	public static readonly DependencyProperty PlayerProperty =
-		DependencyProperty.Register("Player", typeof(IMediaPlayerController), typeof(TransportControls), new PropertyMetadata(null, OnPlayerChanged));
+	[GeneratedDependencyProperty]
+	public partial PlaybackState PlaybackState { get; set; }
 
-	private static void OnPlayerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-	{
-		var tc = (TransportControls)d;
-		if (e.NewValue is not IMediaPlayerController controller)
-		{
-			return;
-		}
+	[GeneratedDependencyProperty]
+	public partial TimeSpan Position { get; set; }
 
-		TimeSpan duration = TimeSpan.Zero;
-		controller.DurationChanged.ObserveOn(RxApp.MainThreadScheduler).Subscribe(e =>
-		{
-			tc.TimeSlider.Maximum = e.TotalMilliseconds;
-			duration = e;
-		});
-		controller.PositionChanged.ObserveOn(RxApp.MainThreadScheduler).Subscribe(e =>
-		{
-			try
-			{
-				var shouldHoldSlider = tc._isSeekingWithSlider ||
-					(tc._pendingSliderSeek is not null && DateTimeOffset.Now < tc._holdSliderPositionUntil);
+	[GeneratedDependencyProperty]
+	public partial TimeSpan Duration { get; set; }
 
-				if (tc._pendingSliderSeek is { } pending && Math.Abs((e - pending).TotalMilliseconds) < 1500)
-				{
-					tc._pendingSliderSeek = null;
-					tc._holdSliderPositionUntil = DateTimeOffset.MinValue;
-					shouldHoldSlider = false;
-				}
+	[GeneratedDependencyProperty]
+	public partial double Volume { get; set; }
 
-				var displayPosition = shouldHoldSlider && tc._pendingSliderSeek is { } target ? target : e;
-				if (!shouldHoldSlider)
-				{
-					tc._isUpdatingSliderFromPlayer = true;
-					tc.TimeSlider.Value = e.TotalMilliseconds;
-					tc._isUpdatingSliderFromPlayer = false;
-				}
+	[GeneratedDependencyProperty]
+	public partial string? SubtitleText { get; set; }
 
-				tc.TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(displayPosition);
-				tc.TxtRemainingTime.Text = TimeRemaining(displayPosition, duration);
-			}
-			catch
-			{
-				tc._isUpdatingSliderFromPlayer = false;
-			}
-		});
-		controller.Playing.ObserveOn(RxApp.MainThreadScheduler).Subscribe(_ => tc.PlayPauseButton.Content = tc._pauseSymbol);
-		controller.Paused.ObserveOn(RxApp.MainThreadScheduler).Subscribe(_ => tc.PlayPauseButton.Content = tc._playSymbol);
-		controller.VolumeChanged
-			.Where(e => e >= 0)
-			.Throttle(TimeSpan.FromSeconds(200))
-			.ObserveOn(RxApp.MainThreadScheduler)
-			.Subscribe(e => tc.VolumeSlider.Value = Math.Floor(e));
-		controller.SubtitleText.ObserveOn(RxApp.MainThreadScheduler).Subscribe(text => tc.Subtitles.Text = text);
-	}
+	[GeneratedDependencyProperty]
+	public partial ObservableCollection<AudioTrack>? AudioTracks { get; set; }
 
-	public IObservable<Unit> OnDynamicSkip { get; }
+	[GeneratedDependencyProperty]
+	public partial ObservableCollection<SubtitleTrack>? SubtitleTracks { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial int? SelectedAudioTrackIndex { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial int? SelectedSubtitleTrackIndex { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? TogglePlayPauseCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SeekCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SkipBackwardCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SkipForwardCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SkipNextCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SkipPreviousCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SetVolumeCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? StopCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? ToggleFullscreenCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SelectAudioTrackCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? SelectSubtitleTrackCommand { get; set; }
+
+	[GeneratedDependencyProperty]
+	public partial ICommand? DisableSubtitlesCommand { get; set; }
 
 	public TransportControls()
 	{
 		InitializeComponent();
-
-		OnDynamicSkip = DynamicSkipIntroButton.Events().Click.Select(_ => Unit.Default);
-
-
-		TimeSlider
-			.Events()
-			.ValueChanged
-			.Subscribe(x =>
-			{
-				try
-				{
-					if (_isUpdatingSliderFromPlayer)
-					{
-						return;
-					}
-
-					if (!_isSeekingWithSlider)
-					{
-						return;
-					}
-
-					_pendingSliderSeek = TimeSpan.FromMilliseconds(x.NewValue);
-					TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(_pendingSliderSeek.Value);
-					TxtRemainingTime.Text = TimeRemaining(_pendingSliderSeek.Value, TimeSpan.FromMilliseconds(TimeSlider.Maximum));
-				}
-				catch { }
-			});
-
-		TimeSlider.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) =>
-		{
-			BeginSliderSeek();
-		}), true);
-
+		TimeSlider.ValueChanged += TimeSlider_ValueChanged;
+		TimeSlider.AddHandler(PointerPressedEvent, new PointerEventHandler((_, _) => BeginSliderSeek()), true);
 		TimeSlider.AddHandler(PointerReleasedEvent, new PointerEventHandler((_, _) => CommitSliderSeek()), true);
 		TimeSlider.AddHandler(PointerCanceledEvent, new PointerEventHandler((_, _) => CommitSliderSeek()), true);
 		TimeSlider.PointerCaptureLost += (_, _) => CommitSliderSeek();
-
-		_onPointerMoved
-			.ObserveOn(RxApp.MainThreadScheduler)
-			.Subscribe(e =>
-			{
-				const int teachingTipMargin = 12;
-				TrickplayTip.IsOpen = true;
-
-				var navView = this.FindAscendantOrSelf<NavigationView>();
-				var offset = navView?.IsPaneOpen == true ? navView.OpenPaneLength : 0;
-				var trickplayWidth = TrickplayScrollViewer.Width + 2 * teachingTipMargin;
-				var halfTrickplayWidth = trickplayWidth / 2;
-
-				var point = e.GetCurrentPoint(TimeSlider);
-				var globalPoint = e.GetCurrentPoint(this);
-				Trickplay.Position = TimeSpan.FromMilliseconds((point.Position.X / TimeSlider.ActualWidth) * TimeSlider.Maximum);
-
-				var minMargin = Math.Max(teachingTipMargin + offset, globalPoint.Position.X + offset - halfTrickplayWidth);
-				var margin = Math.Min(minMargin, ActualWidth + offset - trickplayWidth - 10);
-				TrickplayTip.PlacementMargin = new Thickness(margin, 0, 0, Bar.ActualHeight);
-			});
-
-		VolumeSlider.Events()
-			.ValueChanged
-			.Where(_ => Player is not null)
-			.Subscribe(x => Player.Volume = (int)x.NewValue);
+		VolumeSlider.ValueChanged += VolumeSlider_ValueChanged;
 	}
+
+	partial void OnPlaybackStateChanged(PlaybackState newValue) => UpdatePlayPauseIcon();
+	partial void OnPositionChanged(TimeSpan newValue) => UpdatePosition(newValue);
+	partial void OnDurationChanged(TimeSpan newValue)
+	{
+		TimeSlider.Maximum = Math.Max(0, newValue.TotalMilliseconds);
+		UpdatePosition(Position);
+	}
+
+	partial void OnVolumeChanged(double newValue)
+	{
+		VolumeSlider.Value = Math.Clamp(newValue, 0, 1) * 100;
+	}
+
+	partial void OnSubtitleTextChanged(string? newValue)
+	{
+		Subtitles.Text = newValue ?? "";
+		Subtitles.Visibility = string.IsNullOrWhiteSpace(newValue) ? Visibility.Collapsed : Visibility.Visible;
+	}
+
+	partial void OnAudioTracksChanged(ObservableCollection<AudioTrack>? newValue) => RefreshAudioFlyout();
+	partial void OnSubtitleTracksChanged(ObservableCollection<SubtitleTrack>? newValue) => RefreshSubtitleFlyout();
+	partial void OnSelectedAudioTrackIndexChanged(int? newValue) => RefreshAudioFlyout();
+	partial void OnSelectedSubtitleTrackIndexChanged(int? newValue) => RefreshSubtitleFlyout();
 
 	private static string TimeRemaining(TimeSpan currentTime, TimeSpan duration)
 	{
-		return (duration - currentTime).ToString("hh\\:mm\\:ss");
+		var remaining = duration - currentTime;
+		if (remaining < TimeSpan.Zero)
+		{
+			remaining = TimeSpan.Zero;
+		}
+
+		return remaining.ToString("hh\\:mm\\:ss");
 	}
 
-	private async void SkipBackwardButton_Click(object sender, RoutedEventArgs e) => await SkipBackward();
-
-	private async void SkipForwardButton_Click(object sender, RoutedEventArgs e) => await SkipForward();
-
-	private async void PlayPauseButton_Click(object sender, RoutedEventArgs e) => await TogglePlayPause();
-
-	private async void CastButton_Click(object sender, RoutedEventArgs e)
+	private void UpdatePlayPauseIcon()
 	{
-		if (JellyfinClient is null)
+		PlayPauseButton.Content = PlaybackState is PlaybackState.Playing ? _pauseSymbol : _playSymbol;
+	}
+
+	private void UpdatePosition(TimeSpan position)
+	{
+		var shouldHoldSlider = _isSeekingWithSlider ||
+			(_pendingSliderSeek is not null && DateTimeOffset.Now < _holdSliderPositionUntil);
+
+		if (_pendingSliderSeek is { } pending && Math.Abs((position - pending).TotalMilliseconds) < 1500)
 		{
+			_pendingSliderSeek = null;
+			_holdSliderPositionUntil = DateTimeOffset.MinValue;
+			shouldHoldSlider = false;
+		}
+
+		var displayPosition = shouldHoldSlider && _pendingSliderSeek is { } target ? target : position;
+		if (!shouldHoldSlider)
+		{
+			_isUpdatingSliderFromState = true;
+			TimeSlider.Value = Math.Clamp(position.TotalMilliseconds, 0, TimeSlider.Maximum);
+			_isUpdatingSliderFromState = false;
+		}
+
+		TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(displayPosition);
+		TxtRemainingTime.Text = TimeRemaining(displayPosition, Duration);
+	}
+
+	private void RefreshAudioFlyout()
+	{
+		if (AudioTracks is not { Count: > 0 } audioTracks)
+		{
+			AudioSelectionButton.Flyout = null;
+			AudioSelectionButton.Visibility = Visibility.Collapsed;
 			return;
 		}
 
-		var sessions = await JellyfinClient.GetControllableSessions();
-
-		if (sessions.FirstOrDefault(x => x.Id == SessionInfo.SessionId) is { } session && session.NowPlayingItem is { } dto)
+		var flyout = new MenuFlyout();
+		foreach (var track in audioTracks)
 		{
-			Player.Stop();
-			App.Dialogs.PlayOnSessionCommand.Execute(dto);
+			flyout.Items.Add(new MenuFlyoutItem
+			{
+				Text = string.Join(" - ", new[] { track.Language, track.Name }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim(),
+				Command = SelectAudioTrackCommand,
+				CommandParameter = track.Id,
+				Icon = track.Id == SelectedAudioTrackIndex ? new SymbolIcon(Symbol.Accept) : null
+			});
+		}
+
+		AudioSelectionButton.Flyout = flyout;
+		AudioSelectionButton.Visibility = Visibility.Visible;
+	}
+
+	private void RefreshSubtitleFlyout()
+	{
+		if (SubtitleTracks is not { Count: > 0 } subtitleTracks)
+		{
+			CCSelectionButton.Flyout = null;
+			CCSelectionButton.Visibility = Visibility.Collapsed;
+			return;
+		}
+
+		var flyout = new MenuFlyout();
+		flyout.Items.Add(new MenuFlyoutItem
+		{
+			Text = "Off",
+			Command = DisableSubtitlesCommand,
+			Icon = SelectedSubtitleTrackIndex is null ? new SymbolIcon(Symbol.Accept) : null
+		});
+
+		foreach (var track in subtitleTracks)
+		{
+			flyout.Items.Add(new MenuFlyoutItem
+			{
+				Text = string.Join(" - ", new[] { track.Language, track.Name }.Where(x => !string.IsNullOrWhiteSpace(x))).Trim(),
+				Command = SelectSubtitleTrackCommand,
+				CommandParameter = track.Id,
+				Icon = track.Id == SelectedSubtitleTrackIndex ? new SymbolIcon(Symbol.Accept) : null
+			});
+		}
+
+		CCSelectionButton.Flyout = flyout;
+		CCSelectionButton.Visibility = Visibility.Visible;
+	}
+
+	private async void SkipBackwardButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (SkipBackwardCommand?.CanExecute(null) == true)
+		{
+			SkipBackwardCommand.Execute(null);
+		}
+		await Task.CompletedTask;
+	}
+
+	private async void SkipForwardButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (SkipForwardCommand?.CanExecute(null) == true)
+		{
+			SkipForwardCommand.Execute(null);
+		}
+		await Task.CompletedTask;
+	}
+
+	private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (TogglePlayPauseCommand?.CanExecute(null) == true)
+		{
+			TogglePlayPauseCommand.Execute(null);
+		}
+	}
+
+	private void CastButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (StopCommand?.CanExecute(null) == true)
+		{
+			StopCommand.Execute(null);
+		}
+	}
+
+	private void FullWindowButton_Click(object sender, RoutedEventArgs e)
+	{
+		if (ToggleFullscreenCommand?.CanExecute(null) == true)
+		{
+			ToggleFullscreenCommand.Execute(null);
 		}
 	}
 
 	private void TimeSlider_PointerEntered(object sender, PointerRoutedEventArgs e)
 	{
-		if (Trickplay is null)
+		if (Trickplay is null || Trickplay.Item?.Trickplay?.AdditionalData?.Count is not > 0)
 		{
 			return;
 		}
 
-		if (Trickplay.Item?.Trickplay?.AdditionalData?.Count is not > 0)
-		{
-			return;
-		}
-
-		_onPointerMoved.OnNext(e);
+		TrickplayTip.IsOpen = true;
+		var point = e.GetCurrentPoint(TimeSlider);
+		Trickplay.Position = TimeSpan.FromMilliseconds((point.Position.X / TimeSlider.ActualWidth) * TimeSlider.Maximum);
+		TrickplayTip.PlacementMargin = new Thickness(Math.Max(12, point.Position.X - 120), 0, 0, Bar.ActualHeight);
 	}
 
 	private void TimeSlider_PointerExited(object sender, PointerRoutedEventArgs e)
@@ -238,19 +295,24 @@ public sealed partial class TransportControls : UserControl
 		TrickplayTip.IsOpen = false;
 	}
 
-	private async Task SkipBackward()
+	private void TimeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
 	{
-		await Player.SeekBackward(JellyfinClient, TimeSpan.FromSeconds(10));
+		if (_isUpdatingSliderFromState || !_isSeekingWithSlider)
+		{
+			return;
+		}
+
+		_pendingSliderSeek = TimeSpan.FromMilliseconds(e.NewValue);
+		TxtCurrentTime.Text = Converters.Converters.TimeSpanToString(_pendingSliderSeek.Value);
+		TxtRemainingTime.Text = TimeRemaining(_pendingSliderSeek.Value, Duration);
 	}
 
-	private async Task SkipForward()
+	private void VolumeSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
 	{
-		await Player.SeekForward(JellyfinClient, TimeSpan.FromSeconds(30));
-	}
-
-	private async Task TogglePlayPause()
-	{
-		await Player.TogglePlayPlause(JellyfinClient);
+		if (SetVolumeCommand?.CanExecute(e.NewValue / 100d) == true)
+		{
+			SetVolumeCommand.Execute(e.NewValue / 100d);
+		}
 	}
 
 	private void BeginSliderSeek()
@@ -262,15 +324,10 @@ public sealed partial class TransportControls : UserControl
 
 		_isSeekingWithSlider = true;
 		_pendingSliderSeek = TimeSpan.FromMilliseconds(TimeSlider.Value);
-		_resumePlaybackAfterSliderSeek = Player?.State is MediaPlayerState.Playing;
-
-		if (_resumePlaybackAfterSliderSeek)
+		_resumePlaybackAfterSliderSeek = PlaybackState is PlaybackState.Playing;
+		if (_resumePlaybackAfterSliderSeek && TogglePlayPauseCommand?.CanExecute(null) == true)
 		{
-			try
-			{
-				Player.Pause();
-			}
-			catch { }
+			TogglePlayPauseCommand.Execute(null);
 		}
 	}
 
@@ -282,30 +339,20 @@ public sealed partial class TransportControls : UserControl
 		}
 
 		_isSeekingWithSlider = false;
-
-		if (Player is null)
-		{
-			return;
-		}
-
 		var position = _pendingSliderSeek ?? TimeSpan.FromMilliseconds(TimeSlider.Value);
 		var shouldResume = _resumePlaybackAfterSliderSeek;
 		_pendingSliderSeek = position;
 		_holdSliderPositionUntil = DateTimeOffset.Now.AddSeconds(2);
-		_sliderSeekVersion++;
 		_resumePlaybackAfterSliderSeek = false;
 
-		try
+		if (SeekCommand?.CanExecute(position) == true)
 		{
-			Player.SeekTo(position);
-
-			if (shouldResume)
-			{
-				Player.Play();
-			}
+			SeekCommand.Execute(position);
 		}
-		catch { }
+
+		if (shouldResume && TogglePlayPauseCommand?.CanExecute(null) == true)
+		{
+			TogglePlayPauseCommand.Execute(null);
+		}
 	}
 }
-
-#nullable restore

@@ -1,5 +1,3 @@
-using FluentFin.Core.Contracts.Services;
-
 namespace FluentFin.Core.Playback;
 
 public interface IMediaPlaybackEngine : IAsyncDisposable
@@ -11,7 +9,7 @@ public interface IMediaPlaybackEngine : IAsyncDisposable
 	TimeSpan Position { get; }
 	TimeSpan Duration { get; }
 	bool IsPlaying { get; }
-	bool IsMuted { get; }
+	bool IsMuted { get; set; }
 	double Volume { get; set; }
 
 	event EventHandler<PlaybackStateChangedEventArgs>? StateChanged;
